@@ -1,17 +1,27 @@
-# 01_update_systematic_ids.py — Update Gene Systematic IDs from PomBase Annotation
+# 01_format_and_update_ids.py — Format Phenotype Data & Update Gene Systematic IDs
 
 ---
 
 ## Purpose
 
-Maps the 4,843 gene systematic IDs from the Hayles 2013 supplementary table
-against a current PomBase annotation release. Since the original paper was
-published in 2013, some gene identifiers may have changed due to genome
-annotation updates (gene merges, splits, renames, or reclassification to
-pseudogene or non-coding RNA).
+Performs two sequential operations on the Hayles 2013 supplementary table:
 
-This script is the second step in the pipeline, after
-`00_download_pombase_annotation.py` has cached the annotation file.
+**Phase 1 — Data formatting:**
+- Strips whitespace from key columns (Systematic ID, phenotype descriptions,
+  classification, dispensability)
+- Normalises temperature notation (coerces all variants of `"25, 32"`,
+  `"25 32"`, `"32, 25"` to `"25,32"`)
+- Drops spurious columns (e.g., `Unnamed: 12`)
+- Prints summary statistics of classification and dispensability
+
+**Phase 2 — Gene ID mapping:**
+Maps the 4,843 gene systematic IDs against a current PomBase annotation
+release. Since the original paper was published in 2013, some gene identifiers
+may have changed due to genome annotation updates (gene merges, splits,
+renames, or reclassification to pseudogene or non-coding RNA).
+
+This script replaces the now‑superseded `format_phenotype_input.py` (which
+only did Phase 1).
 
 ---
 
@@ -23,10 +33,12 @@ data/raw/rsob130053supp2.xlsx          Hayles 2013 raw supplementary table
 data/references/pombase-{release}_      PomBase annotation (from step 00)
   gene_IDs_names_products.tsv
                              ↓
-                   01_update_systematic_ids.py
+                   01_format_and_update_ids.py
+                     ├─ Phase 1: format data (strip, normalise, drop)
+                     └─ Phase 2: map IDs via PomBase annotation
                              ↓
-data/1_formatted/                      Updated phenotypes (Systematic ID +
-  Hayles_2013_OB_formatted_              Gene name columns updated)
+data/1_formatted/                      Formatted + ID‑updated phenotypes
+  Hayles_2013_OB_formatted_
   phenotypes.xlsx
                              ↓
 data/references/                       Change log (every gene's mapping
@@ -166,17 +178,17 @@ path from the same constant so the two scripts stay in sync.
 ## Usage
 
 ```bash
-# Default: use raw data, 2026-06-01 annotation, write to data/1_formatted/
-mamba run -n bioinformatics python src/01_update_systematic_ids.py
+# Default: format raw data, map IDs using 2026-06-01 annotation, write to data/1_formatted/
+mamba run -n bioinformatics python src/01_format_and_update_ids.py
 
 # Debug mode
-mamba run -n bioinformatics python src/01_update_systematic_ids.py --verbose
+mamba run -n bioinformatics python src/01_format_and_update_ids.py --verbose
 ```
 
 ### Custom paths
 
 ```bash
-mamba run -n bioinformatics python src/01_update_systematic_ids.py \
+mamba run -n bioinformatics python src/01_format_and_update_ids.py \
     --raw data/raw/rsob130053supp2.xlsx \
     --annotation data/references/pombase-2026-05-01_gene_IDs_names_products.tsv \
     --output data/1_formatted/Hayles_2013_OB_formatted_phenotypes.xlsx \
@@ -198,4 +210,4 @@ mamba run -n bioinformatics python src/01_update_systematic_ids.py \
 ## Dependencies
 
 - pandas, numpy, loguru (all in the `bioinformatics` conda/mamba environment)
-- Standard library: argparse, re, sys, pathlib, urllib (for the download script)
+- Standard library: argparse, enum, re, sys, pathlib, typing

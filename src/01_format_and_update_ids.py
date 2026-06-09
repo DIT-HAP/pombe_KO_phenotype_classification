@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
 ===============================================================================
-Script: 01_update_systematic_ids.py
-Description: Map Hayles 2013 gene systematic IDs against a current PomBase
-             annotation release, updating identifiers that have changed due
-             to genome annotation updates (merges, splits, renames).
+Script: 01_format_and_update_ids.py
+Description: (1) Format raw Hayles 2013 phenotype data — clean whitespace,
+             normalise temperature notation, drop spurious columns.
+             (2) Map gene systematic IDs against a current PomBase annotation,
+             updating identifiers changed by genome annotation updates.
 Author:      Yusheng Yang (guidance) + Hermes (implementation)
 Date:        2026-06-08
 ===============================================================================
@@ -74,6 +75,46 @@ setup_logger()
 # =============================================================================
 # CORE LOGIC
 # =============================================================================
+
+
+@logger.catch
+def format_phenotype_data(df: pd.DataFrame) -> pd.DataFrame:
+    """Clean whitespace and normalise temperature notation in phenotype columns."""
+    # Strip whitespace from key columns
+    df["Systematic ID"] = df["Systematic ID"].str.strip()
+    df["Deletion mutant phenotype description"] = (
+        df["Deletion mutant phenotype description"]
+        .str.strip()
+        .str.strip(".")
+        .str.strip()
+    )
+    df["Phenotypic classification used for analysis"] = (
+        df["Phenotypic classification used for analysis"].str.strip()
+    )
+    df["Gene dispensability. This study"] = (
+        df["Gene dispensability. This study"].str.strip()
+    )
+
+    # Normalise temperature notation: coerce all variants of "25, 32" to "25,32"
+    df.replace(
+        to_replace="25, 32", value="25,32", regex=True, inplace=True,
+    )
+    df.replace(to_replace="25 32", value="25,32", regex=True, inplace=True)
+    df.replace(
+        to_replace="32, 25", value="25,32", regex=True, inplace=True,
+    )
+
+    # Summary statistics
+    logger.info(
+        "Classification categories:\n{}",
+        df["Phenotypic classification used for analysis"].value_counts().to_string(),
+    )
+    logger.info(
+        "Dispensability categories:\n{}",
+        df["Gene dispensability. This study"].value_counts().to_string(),
+    )
+
+    return df
 
 
 @logger.catch
@@ -329,8 +370,8 @@ def build_changelog(
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Update Hayles 2013 gene systematic IDs using current "
-        "PomBase annotation.",
+        description="Format raw Hayles 2013 phenotypes and update systematic IDs "
+        "against current PomBase annotation.",
     )
     parser.add_argument(
         "--raw",
@@ -395,12 +436,21 @@ def main() -> int:
         raw.drop(columns=unnamed, inplace=True)
         logger.debug(f"Dropped spurious column(s): {unnamed}")
 
+    # ------------------------------------------------------------------
+    # 2. Format phenotype data (strip whitespace, normalise temperature)
+    # ------------------------------------------------------------------
+    logger.info("Formatting phenotype data…")
+    raw = format_phenotype_data(raw)
+
+    # ------------------------------------------------------------------
+    # 3. Extract original identifiers before mapping
+    # ------------------------------------------------------------------
     original_ids: list[Any] = raw["Systematic ID"].tolist()
     original_names: list[Any] = raw["Gene name"].tolist()
     logger.info(f"Loaded {len(raw):,} genes, {raw['Gene name'].isna().sum():,} missing gene names")
 
     # ------------------------------------------------------------------
-    # 2. Load PomBase annotation
+    # 4. Load PomBase annotation
     # ------------------------------------------------------------------
     if not annot_path.exists():
         logger.error(
@@ -412,7 +462,7 @@ def main() -> int:
     annotation = read_pombase_annotation(annot_path)
 
     # ------------------------------------------------------------------
-    # 3. Update systematic IDs
+    # 5. Update systematic IDs
     # ------------------------------------------------------------------
     logger.info("Mapping systematic IDs through PomBase annotation…")
     updated_ids, notes = update_sysids(
@@ -431,14 +481,14 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------
-    # 4. Update gene names
+    # 6. Update gene names
     # ------------------------------------------------------------------
     logger.info("Looking up current gene names…")
     updated_names_series = lookup_gene_names(updated_ids, annotation)
     updated_names = updated_names_series.tolist()
 
     # ------------------------------------------------------------------
-    # 5. Build changelog
+    # 7. Build changelog
     # ------------------------------------------------------------------
     changelog_df = build_changelog(
         original_ids,
@@ -450,7 +500,7 @@ def main() -> int:
     logger.info(f"Changelog summary:\n{changelog_df['update_type'].value_counts().to_string()}")
 
     # ------------------------------------------------------------------
-    # 6. Update the raw DataFrame and save
+    # 8. Update the raw DataFrame and save
     # ------------------------------------------------------------------
     raw["Systematic ID"] = updated_ids
     raw["Gene name"] = updated_names
