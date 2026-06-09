@@ -104,7 +104,7 @@ DEFAULT_ANNOTATION = (
     / f"pombase-{DEFAULT_RELEASE}_gene_IDs_names_products.tsv"
 )
 DEFAULT_OUTPUT = Path("data/1_formatted/Hayles_2013_OB_formatted_phenotypes.xlsx")
-DEFAULT_CHANGELOG = Path("data/references/gene_id_mapping_changelog.xlsx")
+DEFAULT_CHANGELOG = Path("data/1_formatted/gene_id_mapping_changelog.xlsx")
 
 # =============================================================================
 # LOGGING SETUP
@@ -553,8 +553,11 @@ def main() -> int:
     # ------------------------------------------------------------------
     # 8. Update the raw DataFrame and save
     # ------------------------------------------------------------------
+    raw["Original Systematic ID"] = original_ids
+    raw["Original Gene name"] = original_names
     raw["Systematic ID"] = updated_ids
     raw["Gene name"] = updated_names
+    raw["note"] = notes
 
     # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
