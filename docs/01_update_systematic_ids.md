@@ -41,7 +41,7 @@ data/1_formatted/                      Formatted + ID‑updated phenotypes
   Hayles_2013_OB_formatted_
   phenotypes.xlsx
                              ↓
-data/references/                       Change log (every gene's mapping
+data/1_formatted/                      Change log (every gene's mapping
   gene_id_mapping_changelog.xlsx         outcome)
 ```
 
@@ -133,13 +133,21 @@ gene symbol in the current PomBase annotation (systematic-ID-only entries).
 
 ### `data/1_formatted/Hayles_2013_OB_formatted_phenotypes.xlsx`
 
-Same 12-column structure as the raw input, but with `Systematic ID` and
-`Gene name` columns updated. This file is the direct input to the next
-pipeline step (`02_format_phenotype_input.py`).
+Extends the original 12-column structure with three extra columns that
+preserve the pre‑mapping state for traceability:
 
-### `data/references/gene_id_mapping_changelog.xlsx`
+| New column | Description |
+|---|---|
+| `Original Systematic ID` | Systematic ID from the Hayles 2013 table (before mapping) |
+| `Original Gene name` | Gene name from the Hayles 2013 table (before mapping, may be NaN) |
+| `note` | Mapping outcome per gene (NO_CHANGE, VIA_SYNONYM → …, RECLASSIFIED → …, etc.) |
 
-Columns:
+The original `Systematic ID` and `Gene name` columns contain the updated
+values. This file is the direct input to the next pipeline step.
+
+### `data/1_formatted/gene_id_mapping_changelog.xlsx`
+
+Separate change‑log file (one row per gene):
 - `original_systematic_id` — ID from Hayles 2013 table
 - `original_gene_name` — Gene name from Hayles 2013 table (may be NaN)
 - `updated_systematic_id` — Current systematic ID after mapping
@@ -192,7 +200,7 @@ mamba run -n bioinformatics python src/01_format_and_update_ids.py \
     --raw data/raw/rsob130053supp2.xlsx \
     --annotation data/references/pombase-2026-05-01_gene_IDs_names_products.tsv \
     --output data/1_formatted/Hayles_2013_OB_formatted_phenotypes.xlsx \
-    --changelog data/references/gene_id_mapping_changelog.xlsx
+    --changelog data/1_formatted/gene_id_mapping_changelog.xlsx
 ```
 
 ### Non-protein-coding filter
@@ -201,7 +209,7 @@ By default, only protein-coding genes are used for the lookup tables. To
 include all feature types:
 
 ```bash
-mamba run -n bioinformatics python src/01_update_systematic_ids.py \
+mamba run -n bioinformatics python src/01_format_and_update_ids.py \
     --gene-filter "gene_type != 'pseudogene'"
 ```
 

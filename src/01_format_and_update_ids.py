@@ -46,9 +46,13 @@ Output
   Cleaned phenotype data with updated Systematic ID and Gene name
   columns (12 columns, 4,843 rows).
 
-- ``data/references/gene_id_mapping_changelog.xlsx``
+- ``data/1_formatted/gene_id_mapping_changelog.xlsx``
   Change log with columns: original_systematic_id, original_gene_name,
   updated_systematic_id, updated_gene_name, note, update_type.
+
+- The main output xlsx now also preserves the original identifiers in
+  columns ``Original Systematic ID``, ``Original Gene name``, and the
+  per‑gene mapping outcome in column ``note``.
 
 Usage
 -----
