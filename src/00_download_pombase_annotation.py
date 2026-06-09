@@ -1,13 +1,43 @@
 #!/usr/bin/env python3
 """
-===============================================================================
-Script: 00_download_pombase_annotation.py
-Description: Download a specific version of the PomBase gene annotation
-             file (gene_IDs_names_products.tsv) from the monthly releases.
-             Caches the file locally; skips re-download if already present.
-Author:      Yusheng Yang (guidance) + Hermes (implementation)
-Date:        2026-06-08
-===============================================================================
+Download PomBase Gene Annotation File
+======================================
+
+Download a specific monthly release of the PomBase gene annotation file
+(gene_IDs_names_products.tsv) and cache it locally. This file serves as
+the reference for updating gene systematic identifiers in downstream
+pipeline steps.
+
+The PomBase annotation covers all annotated S. pombe feature types
+(protein-coding genes, tRNAs, rRNAs, snoRNAs, snRNAs, lncRNAs,
+pseudogenes, etc.) in 8 columns — systematic IDs, gene symbols,
+synonyms, feature types, and cross-references.
+
+Input
+-----
+- URL to PomBase monthly release (constructed from ``--release``).
+  Example: https://www.pombase.org/monthly_releases/2026/
+           pombase-2026-06-01/gene_names_and_identifiers/
+           gene_IDs_names_products.tsv
+
+Output
+------
+- ``data/references/pombase-{release}_gene_IDs_names_products.tsv``
+  Tab-separated file; the 4 columns used by downstream scripts are:
+    - gene_systematic_id (str): PomBase systematic identifier
+    - gene_name (str): Standard gene symbol (may be empty)
+    - gene_type (str): Feature type (e.g. 'protein coding gene')
+    - synonyms (str): Comma-separated alternative names
+
+Usage
+-----
+    mamba run -n bioinformatics python src/00_download_pombase_annotation.py
+    mamba run -n bioinformatics python src/00_download_pombase_annotation.py --release 2026-05-01
+    mamba run -n bioinformatics python src/00_download_pombase_annotation.py --force --verbose
+
+Author:   Yusheng Yang (guidance) + Hermes (implementation)
+Date:     2026-06-08
+Version:  1.0.0
 """
 
 # =============================================================================
