@@ -95,14 +95,14 @@ def build_summaries(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Build summary sheets for the output workbook."""
     summaries: dict[str, pd.DataFrame] = {}
 
-    summaries["Consistency at temperatures"] = (
-        df.value_counts("Consistency at temperatures")
+    summaries["Consistency_25_32"] = (
+        df.value_counts("Consistency_25_32")
         .rename("Count")
         .to_frame()
     )
 
-    summaries["One or multi basic phenotypes"] = (
-        df.value_counts("One or multi basic phenotypes")
+    summaries["Phenotype_count"] = (
+        df.value_counts("Phenotype_count")
         .rename("Count")
         .to_frame()
     )

@@ -20,9 +20,16 @@ Input
 
 Output
 ------
-- ``data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx``
-  3 data sheets + pivot tables. Each data sheet includes ``Category``
+- ``data/3_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx``
+  4 data sheets + pivot tables. Each data sheet includes ``Category``
   and ``Growth_tier`` columns.
+    - ``One basic phenotype`` — single-phenotype, consistent at 25/32°C
+    - ``Multi basic phenotypes`` — multi-phenotype, consistent at 25/32°C
+    - ``Inconsistent phenotypes`` — temperature-inconsistent, manual annotation
+    - ``All genes`` — all 4,843 genes concatenated
+  Pivot tables use the full ``Deletion mutant phenotype description``
+  as row labels (not ``Basic phenotype``), covering each branch plus
+  an all‑genes combined view.
 
 Usage
 -----
@@ -237,7 +244,11 @@ def main() -> int:
     # ------------------------------------------------------------------
     pivots: dict[str, pd.DataFrame] = {}
 
-    for label, df in [("One basic phenotype", one), ("Multi basic phenotypes", multi)]:
+    for label, df in [
+        ("One basic phenotype", one),
+        ("Multi basic phenotypes", multi),
+        ("Inconsistent phenotypes", inconsistent),
+    ]:
         pivots[f"Phenotypes pivot ({label})"] = build_pivot(
             df, "Deletion mutant phenotype description", "Category"
         )
@@ -247,10 +258,15 @@ def main() -> int:
         pivots[f"Classification pivot ({label})"] = build_pivot(
             df, "Phenotypic classification used for analysis", "Category"
         )
-        # Also add Growth_tier breakdown
         pivots[f"Growth_tier pivot ({label})"] = build_pivot(
             df, "Phenotypic classification used for analysis", "Growth_tier"
         )
+
+    # Also build a combined "All genes" pivot for the full description
+    all_genes = pd.concat([one, multi, inconsistent], ignore_index=True)
+    pivots["Phenotypes pivot (All genes)"] = build_pivot(
+        all_genes, "Deletion mutant phenotype description", "Category"
+    )
 
     # ------------------------------------------------------------------
     # 5. Save
@@ -258,9 +274,11 @@ def main() -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with pd.ExcelWriter(output_path) as writer:
+        # Data sheets (3 branches + all genes)
         one.to_excel(writer, sheet_name="One basic phenotype", index=False)
         multi.to_excel(writer, sheet_name="Multi basic phenotypes", index=False)
         inconsistent.to_excel(writer, sheet_name="Inconsistent phenotypes", index=False)
+        all_genes.to_excel(writer, sheet_name="All genes", index=False)
         for sheet_name, pivot_df in pivots.items():
             # Truncate Excel sheet names to 31 chars
             safe_name = sheet_name[:31]

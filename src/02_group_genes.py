@@ -11,6 +11,14 @@ a ``Basic phenotype`` (before the temperature marker) and an
 ``Additional phenotype`` (after the marker), which downstream scripts
 use for growth classification.
 
+The output adds two classification columns:
+- ``Consistency_25_32`` — ``Consistent`` (description spans both
+  25°C and 32°C), ``Only_32`` (described only at 32°C), or
+  ``Mismatch`` (descriptions differ between 25°C and 32°C).
+- ``Phenotype_count`` — ``Single`` (single phenotype), ``Multiple``
+  (comma-separated phenotypes), or ``Temp_mismatch`` (cannot be split
+  due to inconsistent temperature descriptions).
+
 This grouping strategy avoids the need to manually resolve temperature
 differences for the 97% of genes whose descriptions are consistent or
 only available at 32°C. Only the 3% inconsistent entries require manual
@@ -127,10 +135,10 @@ def split_basic_additional(desc_series: pd.Series, marker: str) -> pd.DataFrame:
 
 @logger.catch
 def classify_phenotype_count(phenotype: object) -> str | float:
-    """Classify a basic phenotype as 'One phenotype', 'Multi phenotypes', or NaN."""
+    """Classify a basic phenotype as 'Single', 'Multiple', or NaN."""
     if not isinstance(phenotype, str):
         return np.nan
-    return "Multi phenotypes" if "," in phenotype else "One phenotype"
+    return "Multiple" if "," in phenotype else "Single"
 
 
 # =============================================================================
@@ -184,10 +192,10 @@ def main() -> int:
     # 2. Identify consistency groups
     # ------------------------------------------------------------------
     groups = identify_consistency_groups(df)
-    df["Consistency at temperatures"] = pd.Series(index=df.index, dtype="object")
-    df.loc[groups["both"], "Consistency at temperatures"] = "Consistent"
-    df.loc[groups["only_32"], "Consistency at temperatures"] = "Only at 32"
-    df.loc[groups["inconsistent"], "Consistency at temperatures"] = "Inconsistent"
+    df["Consistency_25_32"] = pd.Series(index=df.index, dtype="object")
+    df.loc[groups["both"], "Consistency_25_32"] = "Consistent"
+    df.loc[groups["only_32"], "Consistency_25_32"] = "Only_32"
+    df.loc[groups["inconsistent"], "Consistency_25_32"] = "Mismatch"
 
     # ------------------------------------------------------------------
     # 3. Split phenotype descriptions
@@ -209,8 +217,14 @@ def main() -> int:
     # ------------------------------------------------------------------
     # 4. Classify one vs multi basic phenotypes
     # ------------------------------------------------------------------
-    df["One or multi basic phenotypes"] = (
+    df["Phenotype_count"] = (
         df["Basic phenotype"].apply(classify_phenotype_count)
+    )
+
+    # For temperature‑inconsistent genes, the phenotype cannot be split into
+    # basic/additional, so assign an explicit label instead of NaN.
+    df.loc[groups["inconsistent"], "Phenotype_count"] = (
+        "Temp_mismatch"
     )
 
     # ------------------------------------------------------------------
@@ -221,12 +235,12 @@ def main() -> int:
     logger.info(f"  Only at 32°C:             {groups['only_32'].sum():,}")
     logger.info(f"  Inconsistent:             {groups['inconsistent'].sum():,}")
 
-    n_one = (df["One or multi basic phenotypes"] == "One phenotype").sum()
-    n_multi = (df["One or multi basic phenotypes"] == "Multi phenotypes").sum()
-    n_na = df["One or multi basic phenotypes"].isna().sum()
+    n_one = (df["Phenotype_count"] == "Single").sum()
+    n_multi = (df["Phenotype_count"] == "Multiple").sum()
+    n_temp_inconsistent = (df["Phenotype_count"] == "Temp_mismatch").sum()
     logger.info(f"  One basic phenotype:      {n_one:,}")
     logger.info(f"  Multi basic phenotypes:   {n_multi:,}")
-    logger.info(f"  Inconsistent (no split):  {n_na:,}")
+    logger.info(f"  Temperature mismatch:     {n_temp_inconsistent:,}")
 
     # ------------------------------------------------------------------
     # 6. Save
@@ -238,16 +252,16 @@ def main() -> int:
         df.to_excel(writer, sheet_name="All genes", index=False)
 
         # Sheet 2: One basic phenotype
-        df[df["One or multi basic phenotypes"] == "One phenotype"].to_excel(
+        df[df["Phenotype_count"] == "Single"].to_excel(
             writer, sheet_name="One basic phenotype", index=False,
         )
         # Sheet 3: Multi basic phenotypes
-        df[df["One or multi basic phenotypes"] == "Multi phenotypes"].to_excel(
+        df[df["Phenotype_count"] == "Multiple"].to_excel(
             writer, sheet_name="Multi basic phenotypes", index=False,
         )
         # Sheet 4: Inconsistent phenotypes (drop split columns)
-        inconsistent_df = df[df["One or multi basic phenotypes"].isna()].drop(
-            columns=["Basic phenotype", "Additional phenotype", "One or multi basic phenotypes"],
+        inconsistent_df = df[df["Phenotype_count"] == "Temp_mismatch"].drop(
+            columns=["Basic phenotype", "Additional phenotype"],
             errors="ignore",
         )
         inconsistent_df.to_excel(writer, sheet_name="Inconsistent phenotypes", index=False)
