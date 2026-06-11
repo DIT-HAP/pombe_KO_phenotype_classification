@@ -35,9 +35,9 @@ pombe_KO_phenotype_classification/
 │   │   └── rsob130053supp2.xlsx
 │   ├── 1_formatted/        formatted phenotype descriptions
 │   ├── 2_phenotype_description_keyword_analysis/
-│   ├── 3_grouped_genes/
-│   ├── 4_categorized_genes/
-│   ├── 5_merged_categories/
+|   ├── 2_grouped_genes/
+|   ├── 3_categorized_genes/
+|   ├── 4_merged_categories/
 │   └── previous_manual_check_of_insistent_phenotypes/
 ├── results/
 │   └── Hayles_2013_OB_merged_categories.xlsx
@@ -45,24 +45,21 @@ pombe_KO_phenotype_classification/
     ├── script_flow.sh                    pipeline entry point
     ├── format_phenotype_input.py
     ├── phenotype_description_keyword_analysis.py
-    ├── groups_genes.py
-    ├── categorize_genes_with_one_phenotype.py
-    ├── categorize_genes_with_multi_phenotypes.py
-    ├── categorize_genes_with_inconsistent_phenotypes.py
-    └── merge_the_categories_and_assign_essentiality.py
+    ├── 02_group_genes.py
+    ├── 03_categorize_phenotypes.py
+    ├── 04_merge_categories.py
+    └── script_flow.sh
 ```
 
 ## Pipeline
 
-Scripts run in this order via `src/script_flow.sh`:
+Scripts run in this order:
 
-1. **format_phenotype_input.py** — parses the raw supplementary table into clean, structured format
-2. **phenotype_description_keyword_analysis.py** — extracts keywords from the phenotype descriptions
-3. **groups_genes.py** — groups genes by phenotype description patterns
-4. **categorize_genes_with_one_phenotype.py** — genes with a single, consistent phenotype
-   **categorize_genes_with_multi_phenotypes.py** — genes with multiple phenotypes
-   **categorize_genes_with_inconsistent_phenotypes.py** — genes with inconsistent observations (e.g. different results at 25°C vs 32°C)
-5. **merge_the_categories_and_assign_essentiality.py** — merges the three classification outputs and adds essentiality info
+1. **00_download_pombase_annotation.py** — downloads the PomBase gene annotation
+2. **01_format_and_update_ids.py** — formats raw data and updates systematic IDs
+3. **02_group_genes.py** — groups genes by phenotype consistency at different temperatures
+4. **03_categorize_phenotypes.py** — categorises growth phenotypes using signal-based detection
+5. **04_merge_categories.py** — merges the three classification branches into one output
 
 Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx`.
 
