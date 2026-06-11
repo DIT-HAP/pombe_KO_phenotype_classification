@@ -24,7 +24,9 @@ Input
 Output
 ------
 - ``data/2_grouped_genes/Hayles_2013_OB_grouped_genes.xlsx``
-  3 sheets:
+  4 sheets:
+    - ``All genes`` — all 4,843 genes with consistency and phenotype split
+      columns added
     - ``One basic phenotype`` — genes with a single, consistent phenotype
       at both temperatures
     - ``Multi basic phenotypes`` — genes with multiple comma-separated
@@ -232,15 +234,18 @@ def main() -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with pd.ExcelWriter(output_path) as writer:
+        # Sheet 1: All genes (total overview)
+        df.to_excel(writer, sheet_name="All genes", index=False)
+
+        # Sheet 2: One basic phenotype
         df[df["One or multi basic phenotypes"] == "One phenotype"].to_excel(
             writer, sheet_name="One basic phenotype", index=False,
         )
+        # Sheet 3: Multi basic phenotypes
         df[df["One or multi basic phenotypes"] == "Multi phenotypes"].to_excel(
             writer, sheet_name="Multi basic phenotypes", index=False,
         )
-
-        # For inconsistent entries, drop the phenotype-split columns
-        # that cannot be meaningfully filled
+        # Sheet 4: Inconsistent phenotypes (drop split columns)
         inconsistent_df = df[df["One or multi basic phenotypes"].isna()].drop(
             columns=["Basic phenotype", "Additional phenotype", "One or multi basic phenotypes"],
             errors="ignore",

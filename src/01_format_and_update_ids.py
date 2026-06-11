@@ -563,6 +563,9 @@ def main() -> int:
     raw["Gene name"] = updated_names
     raw["note"] = notes
 
+    # Fill remaining NaN gene names with the corresponding Systematic ID
+    raw["Gene name"] = raw["Gene name"].fillna(raw["Systematic ID"])
+
     # Ensure output directory exists
     output_path.parent.mkdir(parents=True, exist_ok=True)
     changelog_path.parent.mkdir(parents=True, exist_ok=True)
