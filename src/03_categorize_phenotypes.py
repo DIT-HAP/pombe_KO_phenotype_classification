@@ -269,6 +269,55 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------
+    # 4b. Multi-level pivot for quality inspection
+    #     Rows: full description text.
+    #     Columns: (Growth_tier, Category, Phenotype_count, Consistency_25_32).
+    #     Cells: gene count. Conditional format: colour only non-zero cells.
+    # ------------------------------------------------------------------
+    logger.info("Building multi-level inspection pivot…")
+
+    # Group counts by all four dimensions
+    grouped = (
+        all_genes
+        .groupby([
+            "Deletion mutant phenotype description",
+            "Growth_tier",
+            "Category",
+            "Phenotype_count",
+            "Consistency_25_32",
+        ])
+        .size()
+        .rename("Count")
+        .reset_index()
+    )
+
+    # Pivot with four-level column index
+    multi_pivot = grouped.pivot_table(
+        index="Deletion mutant phenotype description",
+        columns=["Growth_tier", "Category", "Phenotype_count", "Consistency_25_32"],
+        values="Count",
+        fill_value=0,
+    ).astype(int)
+
+    # Sort columns: Growth_tier ascending (1→5), then alphabetical for lower levels
+    multi_pivot = multi_pivot.sort_index(axis=1)
+
+    # Sort rows by binary signature descending.
+    # Each row is converted to a binary vector (1 = non-zero, 0 = zero),
+    # then interpreted as a binary number with the first column as the
+    # most significant bit.  This clusters rows that share the same
+    # non-zero pattern, keeping contiguous columns together.
+    binary = (multi_pivot > 0).astype(int)
+    weights = [2 ** (len(binary.columns) - 1 - i) for i in range(len(binary.columns))]
+    sort_key = binary.dot(pd.Series(weights, index=binary.columns))
+    multi_pivot = multi_pivot.assign(_sort_key=sort_key)
+    multi_pivot = multi_pivot.sort_values("_sort_key", ascending=False).drop(columns="_sort_key")
+
+    styled_pivot = multi_pivot.style.map(
+        lambda v: "background-color: #DCE6F1" if v > 0 else "",
+    )
+
+    # ------------------------------------------------------------------
     # 5. Save
     # ------------------------------------------------------------------
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -283,6 +332,11 @@ def main() -> int:
             # Truncate Excel sheet names to 31 chars
             safe_name = sheet_name[:31]
             pivot_df.to_excel(writer, sheet_name=safe_name)
+
+        # Multi-level inspection pivot (styled)
+        styled_pivot.to_excel(
+            writer, sheet_name="Multi-level pivot (All genes)",
+        )
 
     logger.success(
         f"Categorized phenotypes saved: {output_path}\n"
