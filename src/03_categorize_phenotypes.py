@@ -21,15 +21,17 @@ Input
 Output
 ------
 - ``data/3_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx``
-  4 data sheets + pivot tables. Each data sheet includes ``Category``
-  and ``Growth_tier`` columns.
+  Main data output — 4 sheets with ``Category`` and ``Growth_tier`` columns:
     - ``One basic phenotype`` — single-phenotype, consistent at 25/32°C
     - ``Multi basic phenotypes`` — multi-phenotype, consistent at 25/32°C
     - ``Inconsistent phenotypes`` — temperature-inconsistent, manual annotation
     - ``All genes`` — all 4,843 genes concatenated
-  Pivot tables use the full ``Deletion mutant phenotype description``
-  as row labels (not ``Basic phenotype``), covering each branch plus
-  an all‑genes combined view.
+
+- ``data/3_categorized_genes/Hayles_2013_OB_inspection_pivot.xlsx``
+  Inspection pivot tables — separate from the main output for easy review:
+    - Per‑branch Phenotypes, Essentiality, Classification, Growth_tier pivots
+    - ``Multi-level pivot (All genes)`` — full description text × 4‑level
+      column hierarchy with conditional formatting and binary‑signature sorting
 
 Usage
 -----
@@ -302,16 +304,16 @@ def main() -> int:
     # Sort columns: Growth_tier ascending (1→5), then alphabetical for lower levels
     multi_pivot = multi_pivot.sort_index(axis=1)
 
-    # Sort rows by binary signature descending.
-    # Each row is converted to a binary vector (1 = non-zero, 0 = zero),
-    # then interpreted as a binary number with the first column as the
-    # most significant bit.  This clusters rows that share the same
-    # non-zero pattern, keeping contiguous columns together.
-    binary = (multi_pivot > 0).astype(int)
-    weights = [2 ** (len(binary.columns) - 1 - i) for i in range(len(binary.columns))]
-    sort_key = binary.dot(pd.Series(weights, index=binary.columns))
-    multi_pivot = multi_pivot.assign(_sort_key=sort_key)
-    multi_pivot = multi_pivot.sort_values("_sort_key", ascending=False).drop(columns="_sort_key")
+    # Sort rows so that within each column's non-zero block, values are
+    # sorted descending (largest / most representative at the top).
+    # Columns are prioritised left-to-right (Growth_tier 1 then 2 then 3…):
+    # column 0 is the primary sort key, column 1 the secondary, etc.
+    # All-zero rows sink to the bottom.
+    sort_cols = list(multi_pivot.columns)
+    multi_pivot = multi_pivot.sort_values(
+        by=sort_cols,
+        ascending=[False] * len(sort_cols),
+    )
 
     styled_pivot = multi_pivot.style.map(
         lambda v: "background-color: #DCE6F1" if v > 0 else "",
@@ -322,14 +324,27 @@ def main() -> int:
     # ------------------------------------------------------------------
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Main data output: data sheets only
     with pd.ExcelWriter(output_path) as writer:
-        # Data sheets (3 branches + all genes)
         one.to_excel(writer, sheet_name="One basic phenotype", index=False)
         multi.to_excel(writer, sheet_name="Multi basic phenotypes", index=False)
         inconsistent.to_excel(writer, sheet_name="Inconsistent phenotypes", index=False)
         all_genes.to_excel(writer, sheet_name="All genes", index=False)
+
+    logger.success(
+        f"Categorized phenotypes saved: {output_path}\n"
+        f"  One basic phenotype:    {len(one)} genes\n"
+        f"  Multi basic phenotypes: {len(multi)} genes\n"
+        f"  Inconsistent phenotypes: {len(inconsistent)} genes\n"
+        f"  All genes:              {len(all_genes)} genes",
+    )
+
+    # Inspection output: pivot tables + multi-level pivot
+    inspection_path = output_path.with_name(
+        output_path.stem.replace("_categorized", "_inspection") + output_path.suffix,
+    )
+    with pd.ExcelWriter(inspection_path) as writer:
         for sheet_name, pivot_df in pivots.items():
-            # Truncate Excel sheet names to 31 chars
             safe_name = sheet_name[:31]
             pivot_df.to_excel(writer, sheet_name=safe_name)
 
@@ -338,13 +353,7 @@ def main() -> int:
             writer, sheet_name="Multi-level pivot (All genes)",
         )
 
-    logger.success(
-        f"Categorized phenotypes saved: {output_path}\n"
-        f"  One basic phenotype:    {len(one)} genes\n"
-        f"  Multi basic phenotypes: {len(multi)} genes\n"
-        f"  Inconsistent phenotypes: {len(inconsistent)} genes\n"
-        f"  Pivot tables: {len(pivots)}"
-    )
+    logger.success(f"Inspection pivots saved: {inspection_path}  ({len(pivots) + 1} sheets)")
     return 0
 
 

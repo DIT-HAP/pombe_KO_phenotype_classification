@@ -24,7 +24,7 @@ Usage
     from src.growth_signals import classify_growth
 
     cat, tier = classify_growth("ESSENTIAL germinated spores at 25,32")
-    # cat == "germinated, spores", tier == 1
+    # cat == "germinated", tier == 2
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-06-09
@@ -87,6 +87,22 @@ GROWTH_SIGNALS: list[GrowthSignal] = [
 # =============================================================================
 
 
+def _has_standalone_spores(text: str) -> bool:
+    """Check if ``spores`` appears anywhere NOT as part of ``germinated spores``.
+
+    A standalone occurrence (comma-separated, at the start of a sentence,
+    etc.) indicates a mixed population where both dormant and germinated
+    spores coexist.
+    """
+    for m in re.finditer(r"\bspores?\b", text):
+        start = m.start()
+        # Look at the 12 characters before 'spores'
+        before = text[max(0, start - 12) : start].strip().rstrip(",")
+        if before != "germinated":
+            return True
+    return False
+
+
 def classify_growth(description: str) -> tuple[str, int]:
     """Return (category, growth_tier) for a phenotype description string.
 
@@ -111,10 +127,21 @@ def classify_growth(description: str) -> tuple[str, int]:
 
     # Post-process: remove redundant broader categories when a more specific
     # one is already present.
-    # - "germinated" is implied by "germinated and divided"
+    # Priority order matters: check spores/germinated relation BEFORE
+    # germinated/germinated-and-divided substitution.
+
+    # 1. "spores" is implied by "germinated" when it only appears as part of
+    #    the phrase "germinated spores" (i.e. no standalone spores).
+    #    Check this BEFORE germinated→germinated and divided substitution.
+    has_germinated = any("germinated" in cat for cat in unique_categories)
+    if "spores" in unique_categories and has_germinated:
+        if not _has_standalone_spores(desc_lower):
+            unique_categories.remove("spores")
+
+    # 2. "germinated" is implied by "germinated and divided"
     if "germinated and divided" in unique_categories and "germinated" in unique_categories:
         unique_categories.remove("germinated")
-    # - "small colonies" is implied by "very small colonies"
+    # 3. "small colonies" is implied by "very small colonies"
     if "very small colonies" in unique_categories and "small colonies" in unique_categories:
         unique_categories.remove("small colonies")
 
