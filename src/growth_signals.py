@@ -76,6 +76,7 @@ GROWTH_SIGNALS: list[GrowthSignal] = [
     GrowthSignal(keyword="microcolonies", category="microcolonies", tier=3),
     # tier 2
     GrowthSignal(keyword="germinated", category="germinated", tier=2),
+    GrowthSignal(keyword="germination", category="germinated", tier=2),
     GrowthSignal(keyword="divide", category="germinated and divided", tier=2),
     GrowthSignal(keyword="division", category="germinated and divided", tier=2),
     # tier 1
