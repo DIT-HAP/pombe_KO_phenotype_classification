@@ -16,13 +16,13 @@ Replaces the original `merge_the_categories_and_assign_essentiality.py`.
 ## Data Flow
 
 ```
-data/3_categorized_genes/                Categorized output from step 03
+data/4_categorized_genes/                Categorized output from step 03
   Hayles_2013_OB_categorized_            3 data sheets
   phenotypes.xlsx
                              ↓
                    03_merge_categories.py
                              ↓
-data/4_merged_categories/                Final merged table + summaries
+data/5_merged_categories/                Final merged table + summaries
   Hayles_2013_OB_merged_categories.xlsx
 
 results/                                 Copy for source control

@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Reads grouped phenotype data (3 sheets from step 03), assigns each gene a
+Reads grouped phenotype data (3 sheets from step 02), assigns each gene a
 fine-grained `Category` and a coarse `Growth_tier` (1–5) using the
 signal-based `classify_growth()` engine.
 
@@ -15,7 +15,7 @@ Replaces the three original `categorize_genes_with_*_phenotypes.py` scripts.
 ## Data Flow
 
 ```
-data/2_grouped_genes/                    Grouped genes from step 02
+data/3_grouped_genes/                    Grouped genes from step 02
   Hayles_2013_OB_grouped_genes.xlsx      (3 sheets: one/multi/inconsistent)
                              ↓
 data/previous_manual_check_of_           Manual annotations for the

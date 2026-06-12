@@ -46,10 +46,10 @@ from loguru import logger
 # =============================================================================
 
 DEFAULT_INPUT = Path(
-    "data/3_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx"
+    "data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx"
 )
 DEFAULT_OUTPUT = Path(
-    "data/4_merged_categories/Hayles_2013_OB_merged_categories.xlsx"
+    "data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx"
 )
 DEFAULT_RESULTS = Path(
     "results/Hayles_2013_OB_merged_categories.xlsx"

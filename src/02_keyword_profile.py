@@ -18,7 +18,7 @@ Input
 
 Output
 ------
-- ``data/5_keyword_profile/growth_tier_keyword_profile.xlsx``
+- ``data/2_keyword_profile/growth_tier_keyword_profile.xlsx``
   8 sheets:
     - ``Tier sizes`` — gene count per Growth_tier
     - ``Total vocab`` — all words with Category column, sorted by
@@ -67,7 +67,7 @@ from loguru import logger
 # =============================================================================
 
 DEFAULT_INPUT = Path("results/Hayles_2013_OB_merged_categories.xlsx")
-DEFAULT_OUTPUT = Path("data/5_keyword_profile/growth_tier_keyword_profile.xlsx")
+DEFAULT_OUTPUT = Path("data/2_keyword_profile/growth_tier_keyword_profile.xlsx")
 
 # ——— Word categories ——————————————————————————————————————————————————————————
 

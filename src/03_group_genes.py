@@ -31,7 +31,7 @@ Input
 
 Output
 ------
-- ``data/2_grouped_genes/Hayles_2013_OB_grouped_genes.xlsx``
+- ``data/3_grouped_genes/Hayles_2013_OB_grouped_genes.xlsx``
   4 sheets:
     - ``All genes`` — all 4,843 genes with consistency and phenotype split
       columns added
@@ -72,7 +72,7 @@ from loguru import logger
 # =============================================================================
 
 DEFAULT_INPUT = Path("data/1_formatted/Hayles_2013_OB_formatted_phenotypes.xlsx")
-DEFAULT_OUTPUT = Path("data/2_grouped_genes/Hayles_2013_OB_grouped_genes.xlsx")
+DEFAULT_OUTPUT = Path("data/3_grouped_genes/Hayles_2013_OB_grouped_genes.xlsx")
 
 # Temperature marker used to detect consistency in phenotype descriptions
 TEMP_BOTH = "25,32"

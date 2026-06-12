@@ -2,7 +2,7 @@
 Categorise Growth Phenotypes
 =============================
 
-Reads grouped phenotype data (3 sheets from step 03), assigns each gene a
+Reads grouped phenotype data (3 sheets from step 02), assigns each gene a
 fine-grained ``Category`` and a coarse ``Growth_tier`` (1–5) using the
 signal-based ``classify_growth()`` engine.
 
@@ -20,14 +20,14 @@ Input
 
 Output
 ------
-- ``data/3_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx``
+- ``data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx``
   Main data output — 4 sheets with ``Category`` and ``Growth_tier`` columns:
     - ``One basic phenotype`` — single-phenotype, consistent at 25/32°C
     - ``Multi basic phenotypes`` — multi-phenotype, consistent at 25/32°C
     - ``Inconsistent phenotypes`` — temperature-inconsistent, manual annotation
     - ``All genes`` — all 4,843 genes concatenated
 
-- ``data/3_categorized_genes/Hayles_2013_OB_inspection_pivot.xlsx``
+- ``data/4_categorized_genes/Hayles_2013_OB_inspection_pivot.xlsx``
   Inspection pivot tables — separate from the main output for easy review:
     - Per‑branch Phenotypes, Essentiality, Classification, Growth_tier pivots
     - ``Multi-level pivot (All genes)`` — full description text × 4‑level
@@ -66,13 +66,13 @@ from growth_signals import GROWTH_SIGNALS, classify_growth
 # =============================================================================
 
 # Paths relative to project root
-DEFAULT_GROUPED = Path("data/2_grouped_genes/Hayles_2013_OB_grouped_genes.xlsx")
+DEFAULT_GROUPED = Path("data/3_grouped_genes/Hayles_2013_OB_grouped_genes.xlsx")
 DEFAULT_MANUAL = Path(
     "data/previous_manual_check_of_insistent_phenotypes"
     "/Inconsistent_phenotypes_at_25_32_manual.xlsx"
 )
 DEFAULT_OUTPUT = Path(
-    "data/3_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx"
+    "data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx"
 )
 
 # Reverse lookup: known category name → growth tier.
