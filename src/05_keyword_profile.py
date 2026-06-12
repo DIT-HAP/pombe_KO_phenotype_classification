@@ -19,15 +19,20 @@ Input
 Output
 ------
 - ``data/5_keyword_profile/growth_tier_keyword_profile.xlsx``
-  6 sheets:
+  8 sheets:
     - ``Tier sizes`` — gene count per Growth_tier
-    - ``Total vocab`` — all words, sorted by total frequency
-    - ``Growth signals`` — only canonical signal words
-      (spores, germinated, microcolonies, divide, etc.)
-    - ``Morphology`` — shape/state words
-      (long, misshapen, stubby, rounded, skittle, etc.)
-    - ``Modifiers`` — frequency/degree words
-      (occasionally, often, some, slightly, very, etc.)
+    - ``Total vocab`` — all words with Category column, sorted by
+      Category then frequency
+    - ``Growth signals`` — canonical growth‑stage words
+      (spores, germinated, microcolonies, small colonies, etc.)
+    - ``Morphology`` — shape / structural words
+      (long, curved, stubby, rounded, branched, misshapen, etc.)
+    - ``Viability`` — cell death / survival words
+      (lysis, dead, die, inviable)
+    - ``Process`` — genetic / cellular process words
+      (diploidising, suppressors, revertants, stationary, etc.)
+    - ``Modifiers`` — frequency, degree, and quantity words
+      (occasionally, often, slightly, some, many, once, …)
     - ``Other words`` — remaining words not in any category above
 
 Usage
@@ -70,51 +75,120 @@ DEFAULT_OUTPUT = Path("data/5_keyword_profile/growth_tier_keyword_profile.xlsx")
 GROWTH_SIGNAL_WORDS = {
     "spores", "spore", "germinated", "germinate", "germination",
     "microcolonies", "microcolony",
-    "divide", "division", "divided", "divides",
+    "divide", "division", "divided", "divides", "divisions",
     "colonies", "colony",
+    "small-colonies", "small-colony",
+    "very-small-colonies", "very-small-colony",
 }
+GROWTH_STEMS = {"spore", "germinated", "germinate", "germination",
+                "microcoloni", "divide", "division", "colon"}
 
-# 2. Modifier / frequency words (signal that the main phenotype is partial)
-MODIFIER_WORDS = {
-    "occasionally", "often", "occasional", "may", "some",
-    "sometimes", "mostly", "rarely", "frequently", "possible",
-    "occasionally,", "often,", "some,", "possibly",
-    "slightly", "very", "highly", "barely", "barely",
-    "lots", "many", "more", "once", "twice", "several",
-    "few", "multiple", "a",
-}
-
-# 3. Morphological words (from Hayles 2013 and the FYPO table)
+# 2. Morphology — shape / structural words only
 MORPHOLOGY_WORDS = {
-    "long", "short", "branched", "curved", "stubby", "rounded", "skittle",
+    "long", "short", "branched", "curved", "stubby", "rounded", "skittle", "skittles",
     "misshapen", "swollen", "septated", "septum", "multiseptated",
-    "small", "wide", "wider", "longer", "shorter",
+    "small", "wide", "wider", "longer", "shorter", "large", "larger",
     "thin", "narrow", "aberrantly", "abnormal",
     "tapered", "t-shaped", "dumbbell", "shaped",
-    "lyses", "lysis", "dead", "die", "dying", "inviable",
     "vacuolated", "dark", "piled", "up",
-    "diploids", "diploidising", "diploidises", "suppressors",
-    "reverting", "revertants",
-    "misplaced", "misplace", "misplaced",
-    "colour", "edged", "edges", "wavy",
+    "misplaced", "misplace",
+    "colour", "colored", "edged", "edges", "wavy",
     "septated", "multiseptated",
 }
+MORPH_STEMS = {"long", "short", "branch", "curved", "curv", "stubby", "round",
+               "skittle", "swollen", "sept", "misshapen",
+               "small", "wide", "thin", "narrow", "aberrant", "abnormal", "larg",
+               "taper", "dumbbell", "shaped", "centr",
+               "vacuol", "dark",
+               "misplac", "chain",
+               "colour", "color", "edg", "wav"}
 
-# 4. Common stop words — removed entirely
+# 3. Viability — cell death / survival
+VIABILITY_WORDS = {
+    "lyses", "lysis", "lysed",
+    "dead", "die", "dying", "dies",
+    "inviable",
+}
+VIABILITY_STEMS = {"lys", "dead", "die", "dyi", "inviable"}
+
+# 4. Process — genetic / cellular processes
+PROCESS_WORDS = {
+    "diploids", "diploidising", "diploidises", "diploid",
+    "suppressors", "supressors", "suppressor",
+    "reverting", "revertants", "revert", "reverts",
+    "stationary", "stationary",
+    "phase",
+    "sporulating", "sporulation",
+}
+PROCESS_STEMS = {"diploid", "suppressor", "supressor",
+                 "revert",
+                 "stationar", "phase",
+                 "sporulat"}
+
+# 5. Modifier sub‑categories
+MOD_FREQ_WORDS = {
+    "occasionally", "often", "occasional", "sometimes",
+    "mostly", "rarely", "frequently", "frequency", "rare",
+    "possible", "may", "possibly", "rapidly", "initially",
+}
+MOD_FREQ_STEMS = {"occasionally", "occasion", "often", "sometimes",
+                  "mostly", "rare", "frequent", "possible", "may",
+                  "possibl", "rapid", "initial"}
+
+MOD_DEGREE_WORDS = {
+    "slightly", "very", "highly", "barely", "slight", "high", "weak",
+}
+MOD_DEGREE_STEMS = {"slight", "very", "high", "barely", "weak"}
+
+MOD_QUANT_WORDS = {
+    "some", "many", "few", "lots", "several", "multiple",
+    "once", "twice", "more", "multi", "many",
+    "few", "lots",
+}
+MOD_QUANT_STEMS = {"some", "many", "few", "lots", "several", "multiple",
+                   "more", "multi", "many",
+                   "once", "twice"}
+
+# 6. Stop words — removed entirely
 STOP_WORDS = {
     "at", "in", "of", "to", "and", "or", "the", "a", "an",
     "cells", "cell", "are", "is", "was", "were", "be",
     "with", "for", "after", "before", "more", "most",
     "25,32", "25,32,", "32,", "25,", "'",
     "25", "32", "36", "48h", "h",
-    "wt", "viable", "essential",
+    "wt", "viable", "essential", "yes",
     "but", "not", "no", "then", "give", "gives",
     "less", "almost", "wee", "one", "two", "three",
     "than", "as", "by", "from", "has", "had",
+    "so", "on", "have",
+}
+STOP_STEMS = {"at", "in", "of", "to", "and", "or", "the", "a", "an",
+               "cell", "are", "is", "was", "were", "be",
+               "with", "for", "after", "before",
+               "25", "32", "36", "48h", "h",
+               "wt", "viable", "essential", "yes",
+               "but", "not", "no", "then",
+               "so", "on", "have", "has", "had",
+               "than", "as", "by", "from"}
+
+# 5. Multi‑word phrases that should be kept as single tokens.
+#    Keys are the raw phrase; values are the hyphenated token.
+PHRASE_PATTERNS: dict[str, str] = {
+    "very small colonies": "very-small-colonies",
+    "very small colony":   "very-small-colony",
+    "small colonies":      "small-colonies",
+    "small colony":        "small-colony",
 }
 
+# Reverse mapping: hyphenated token → original display phrase
+DISPLAY_NAMES: dict[str, str] = {v: k for k, v in PHRASE_PATTERNS.items()}
+
 # Combined ignore set for the 'all other words' table
-IGNORED = GROWTH_SIGNAL_WORDS | MODIFIER_WORDS | MORPHOLOGY_WORDS | STOP_WORDS
+ALL_STEMS = (
+    GROWTH_STEMS | MORPH_STEMS | VIABILITY_STEMS | PROCESS_STEMS
+    | MOD_FREQ_STEMS | MOD_DEGREE_STEMS | MOD_QUANT_STEMS | STOP_STEMS
+)
+IGNORED: set[str] = set(ALL_STEMS) | set(PHRASE_PATTERNS.values())
 
 # ——— Tokenisation ————————————————————————————————————————————————————————————
 
@@ -148,8 +222,17 @@ setup_logger()
 
 
 def tokenise(text: str) -> list[str]:
-    """Split a description into lowercase word tokens, stripping punctuation."""
-    return [t.strip(".,;:!?'") for t in _TOKEN_RE.split(text.lower()) if t.strip(".,;:!?'")]
+    """Split a description into lowercase word tokens.
+
+    Multi‑word phrases in ``PHRASE_PATTERNS`` are replaced with hyphenated
+    tokens before splitting, so that ``small colonies`` becomes the single
+    token ``small-colonies``.
+    """
+    t = text.lower()
+    # Replace multi‑word phrases first (longest match wins by iteration order)
+    for phrase, replacement in PHRASE_PATTERNS.items():
+        t = t.replace(phrase, replacement)
+    return [tok.strip(".,;:!?'") for tok in re.split(r"[,\s;:()]+", t) if tok.strip(".,;:!?'")]
 
 
 def tier_label(tier: int) -> str:
@@ -163,12 +246,65 @@ def tier_label(tier: int) -> str:
     }.get(tier, f"Tier {tier}")
 
 
+def _classify_word(word: str) -> str:
+    """Return the category label for *word*.
+
+    Exact membership in the original category sets is checked first,
+    then stem‑prefix matching as a fallback.
+    """
+    # 1. Exact match in original sets (handles hyphenated / compound tokens)
+    if word in GROWTH_SIGNAL_WORDS:
+        return "Growth signal"
+    if word in MORPHOLOGY_WORDS:
+        return "Morphology"
+    if word in VIABILITY_WORDS:
+        return "Viability"
+    if word in PROCESS_WORDS:
+        return "Process"
+    if word in MOD_FREQ_WORDS:
+        return "Modifier:Frequency"
+    if word in MOD_DEGREE_WORDS:
+        return "Modifier:Degree"
+    if word in MOD_QUANT_WORDS:
+        return "Modifier:Quantity"
+    if word in STOP_WORDS:
+        return "Stop word"
+
+    # 2. Stem‑prefix fallback
+    for stem in GROWTH_STEMS:
+        if word.startswith(stem) and len(stem) >= 3:
+            return "Growth signal"
+    for stem in MORPH_STEMS:
+        if word.startswith(stem) and len(stem) >= 3:
+            return "Morphology"
+    for stem in VIABILITY_STEMS:
+        if word.startswith(stem) and len(stem) >= 3:
+            return "Viability"
+    for stem in PROCESS_STEMS:
+        if word.startswith(stem) and len(stem) >= 3:
+            return "Process"
+    for stem in MOD_FREQ_STEMS:
+        if word.startswith(stem) and len(stem) >= 3:
+            return "Modifier:Frequency"
+    for stem in MOD_DEGREE_STEMS:
+        if word.startswith(stem) and len(stem) >= 3:
+            return "Modifier:Degree"
+    for stem in MOD_QUANT_STEMS:
+        if word.startswith(stem) and len(stem) >= 3:
+            return "Modifier:Quantity"
+    for stem in STOP_STEMS:
+        if word == stem or word.rstrip("s") == stem or word.rstrip("d") == stem:
+            return "Stop word"
+
+    return "Other"
+
+
 @logger.catch
 def build_term_table(
     term_counts: dict[int, Counter],
-    term_category: str,
+    term_category: str | None = None,
     selected_terms: set[str] | None = None,
-    top_n: int = 50,
+    top_n: int | None = 50,
 ) -> pd.DataFrame:
     """Build a DataFrame: rows = terms, columns = tier frequencies."""
     rows: list[dict] = []
@@ -196,9 +332,19 @@ def build_term_table(
     # Rename columns to human-readable
     pivot.columns = [f"Tier_{c}_{tier_label(c)}" for c in pivot.columns]
 
+    # Add category column (before the numeric columns) — do this BEFORE
+    # renaming the index so the classifier sees the hyphenated tokens.
+    pivot.insert(0, "Category", [_classify_word(w) for w in pivot.index])
+
+    # Restore original display names for hyphenated compound tokens
+    pivot = pivot.rename(index=DISPLAY_NAMES)
+
     # Add total column and sort
-    pivot["Total"] = pivot.sum(axis=1)
-    pivot = pivot.sort_values("Total", ascending=False).head(top_n)
+    pivot["Total"] = pivot.iloc[:, 1:].sum(axis=1)  # skip Category col
+    # Sort by Category (alphabetical), then Total descending
+    pivot = pivot.sort_values(["Category", "Total"], ascending=[True, False])
+    if top_n is not None:
+        pivot = pivot.head(top_n)
 
     return pivot
 
@@ -264,9 +410,9 @@ def main() -> int:
     # 3. Build output tables
     # ------------------------------------------------------------------
 
-    # 3a — All words (total vocab, top 100)
+    # 3a — All words (full list with category labels)
     logger.info("Building vocabulary tables …")
-    total_vocab = build_term_table(tier_word_counts, "all", top_n=100)
+    total_vocab = build_term_table(tier_word_counts, "all", top_n=None)
     total_vocab.index.name = "word"
 
     # 3b — Growth signals only
@@ -289,11 +435,25 @@ def main() -> int:
     if not morph_table.empty:
         morph_table.index.name = "word"
 
-    # 3d — Modifier words only
+    # 3d — Viability words
+    viability_table = build_term_table(
+        tier_word_counts, "viability", selected_terms=VIABILITY_WORDS, top_n=30,
+    )
+    if not viability_table.empty:
+        viability_table.index.name = "word"
+
+    # 3e — Process words
+    process_table = build_term_table(
+        tier_word_counts, "process", selected_terms=PROCESS_WORDS, top_n=30,
+    )
+    if not process_table.empty:
+        process_table.index.name = "word"
+
+    # 3f — Modifier words (all sub‑categories combined)
     mod_table = build_term_table(
         tier_word_counts,
         "modifiers",
-        selected_terms=MODIFIER_WORDS,
+        selected_terms=MOD_FREQ_WORDS | MOD_DEGREE_WORDS | MOD_QUANT_WORDS,
         top_n=80,
     )
     if not mod_table.empty:
@@ -322,6 +482,10 @@ def main() -> int:
             growth_table.to_excel(writer, sheet_name="Growth signals")
         if not morph_table.empty:
             morph_table.to_excel(writer, sheet_name="Morphology")
+        if not viability_table.empty:
+            viability_table.to_excel(writer, sheet_name="Viability")
+        if not process_table.empty:
+            process_table.to_excel(writer, sheet_name="Process")
         if not mod_table.empty:
             mod_table.to_excel(writer, sheet_name="Modifiers")
 
