@@ -23,8 +23,8 @@ Usage
 -----
     from src.growth_signals import classify_growth
 
-    cat, tier = classify_growth("ESSENTIAL germinated spores at 25,32")
-    # cat == "germinated", tier == 2
+    cat, tier = classify_growth("VIABLE WT cells at 25,32")
+    # cat == "WT-like", tier == 5
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-06-09
@@ -62,7 +62,7 @@ TIER_LABELS: dict[int, str] = {
     2: "Germinated (limited or no division)",
     3: "Microcolonies (severely limited growth)",
     4: "Small colonies (visible but reduced)",
-    5: "WT (normal growth)",
+    5: "WT-like (normal growth)",
 }
 
 # Canonical signal table, ordered from most to least specific.
@@ -109,7 +109,7 @@ def classify_growth(description: str) -> tuple[str, int]:
 
     Detects all growth signals present in the description, composes their
     category names (sorted, deduplicated), and assigns the worst (lowest)
-    tier. If no signals are found, returns ``("WT", 5)``.
+    tier. If no signals are found, returns ``("WT-like", 5)``.
     """
     desc_lower = description.lower()
 
@@ -121,7 +121,7 @@ def classify_growth(description: str) -> tuple[str, int]:
 
     # No growth signal → WT
     if not matched:
-        return ("WT", 5)
+        return ("WT-like", 5)
 
     # Compose unique category names sorted alphabetically
     unique_categories: list[str] = sorted({s.category for s in matched})

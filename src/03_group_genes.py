@@ -81,15 +81,22 @@ TEMP_32 = "32"
 # Modifier words — when a comma‑separated segment starts with one of these,
 # it is treated as a secondary description, not a parallel phenotype.
 MODIFIER_WORDS = (
-    "occasionally", "often", "occasional", "may", "some",
-    "sometimes", "mostly", "rarely", "frequently", "possible",
+    # Frequency
+    "occasionally", "often", "occasional", "sometimes",
+    "mostly", "rarely", "frequently", "frequency", "rare",
+    "possible", "may", "possibly", "rapidly", "initially",
+    # Degree
+    "slightly", "very", "highly", "barely", "slight", "high", "weak",
+    # Quantity
+    "some", "many", "few", "lots", "several", "multiple",
+    "once", "twice", "more", "multi",
 )
 
 # Growth‑signal keywords (derived from growth_signals.GROWTH_SIGNALS).
 # Used to detect whether a comma‑separated segment describes a parallel
 # growth phenotype rather than a morphological supplement.
 GROWTH_KEYWORDS = (
-    "spores", "germinated", "microcolonies",
+    "spores", "germinated", "germination", "microcolonies",
     "small colon", "very small colon",
     "divide", "division",
 )

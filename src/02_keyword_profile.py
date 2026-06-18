@@ -242,7 +242,7 @@ def tier_label(tier: int) -> str:
         2: "Germinated",
         3: "Microcolonies",
         4: "Small colonies",
-        5: "WT",
+        5: "WT-like",
     }.get(tier, f"Tier {tier}")
 
 
