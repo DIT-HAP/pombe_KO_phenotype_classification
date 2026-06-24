@@ -27,7 +27,7 @@ Output
     - ``Inconsistent phenotypes`` — temperature-inconsistent, manual annotation
     - ``All genes`` — all 4,843 genes concatenated
 
-- ``data/4_categorized_genes/Hayles_2013_OB_inspection_pivot.xlsx``
+- ``data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes.xlsx``
   Inspection pivot tables — separate from the main output for easy review:
     - Per‑branch Phenotypes, Essentiality, Classification, Growth_tier pivots
     - ``Multi-level pivot (All genes)`` — full description text × 4‑level
