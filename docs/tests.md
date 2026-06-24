@@ -41,7 +41,7 @@ what `(category, tier)` pair is returned?
 | `ESSENTIAL germinated spores` | germinated | 2 |
 | `ESSENTIAL germinated spores long` | germinated | 2 |
 | `VIABLE germination at 25` | germinated | 2 |
-| `VIABLE WT cells, some germination long` | germinated | 2 | — raw `classify_growth` scan |
+| `VIABLE WT cells, some germination long` | WT-like | 5 | `some` is modifier → `germination` dropped |
 | `ESSENTIAL germinated spores divide` | germinated and divided | 2 |
 | `ESSENTIAL germinated spores division` | germinated and divided | 2 |
 | `germinated spores divides once` | germinated and divided | 2 |

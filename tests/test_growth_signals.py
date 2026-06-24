@@ -70,11 +70,15 @@ class TestGerminated:
         """``germination`` (noun form) should also be detected."""
         assert_result("VIABLE germination at 25", cat="germinated", tier=2)
 
-    def test_some_germination_detected(self):
-        """``classify_growth`` scans the full text — ``germination`` is found."""
+    def test_some_germination_filtered_to_wt_like(self):
+        """``classify_growth`` filters modifier segments internally.
+
+        ``some germination long`` starts with ``some`` → dropped, leaving
+        ``VIABLE WT cells`` → no signal → WT-like.
+        """
         assert_result(
             "VIABLE WT cells, some germination long",
-            cat="germinated", tier=2,
+            cat="WT-like", tier=5,
         )
 
     def test_germinated_spores_no_separate_spores(self):

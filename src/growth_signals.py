@@ -171,8 +171,13 @@ def classify_growth(description: str) -> tuple[str, int]:
     Detects all growth signals present in the description, composes their
     category names (sorted, deduplicated), and assigns the worst (lowest)
     tier. If no signals are found, returns ``("WT-like", 5)``.
+
+    Modifier‑led comma segments (e.g. ``some germination long``) are
+    filtered out before detection so that secondary descriptions do not
+    trigger growth signals.
     """
-    desc_lower = description.lower()
+    filtered = filter_primary_segments(description)
+    desc_lower = filtered.lower()
 
     # Collect all matching signals
     matched: list[GrowthSignal] = []
