@@ -236,6 +236,24 @@ class TestClassifyPhenotypeCount:
     def test_pure_microcolonies_single(self):
         assert classify_phenotype_count("ESSENTIAL microcolonies") == "Single"
 
+    def test_some_germination_pipeline_wt_like(self):
+        """After filter_primary_segments + classify_growth,
+        ``VIABLE WT cells, some germination long`` → WT-like.
+
+        ``some germination long`` starts with modifier ``some`` → dropped,
+        leaving ``VIABLE WT cells`` → no growth signal → WT-like (tier 5).
+        """
+        from growth_signals import filter_primary_segments, classify_growth
+
+        filtered = filter_primary_segments(
+            "VIABLE WT cells, some germination long"
+        )
+        assert filtered == "VIABLE WT cells"
+
+        cat, tier = classify_growth(filtered)
+        assert cat == "WT-like"
+        assert tier == 5
+
 
 # ── Sanity check: our hard-coded lists ──────────────────────────────────────────
 

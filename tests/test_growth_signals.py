@@ -70,9 +70,12 @@ class TestGerminated:
         """``germination`` (noun form) should also be detected."""
         assert_result("VIABLE germination at 25", cat="germinated", tier=2)
 
-    def test_germinated_with_some(self):
-        """``some germination`` in the basic text — germination IS present."""
-        assert_result("VIABLE WT cells, some germination long", cat="germinated", tier=2)
+    def test_some_germination_detected(self):
+        """``classify_growth`` scans the full text — ``germination`` is found."""
+        assert_result(
+            "VIABLE WT cells, some germination long",
+            cat="germinated", tier=2,
+        )
 
     def test_germinated_spores_no_separate_spores(self):
         """``germinated spores`` alone — spores is implied, not separate."""
