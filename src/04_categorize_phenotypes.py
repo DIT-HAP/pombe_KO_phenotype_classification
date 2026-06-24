@@ -59,7 +59,7 @@ import pandas as pd
 from loguru import logger
 
 # 3b. Local module
-from growth_signals import GROWTH_SIGNALS, classify_growth
+from growth_signals import GROWTH_SIGNALS, classify_growth, filter_primary_segments
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -73,18 +73,6 @@ DEFAULT_MANUAL = Path(
 )
 DEFAULT_OUTPUT = Path(
     "data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx"
-)
-
-# Modifier words — when a comma‑separated segment starts with one of these,
-# it is treated as a secondary description and excluded from classification.
-# Must match the list in 03_group_genes.py.
-MODIFIER_WORDS = (
-    "occasionally", "often", "occasional", "sometimes",
-    "mostly", "rarely", "frequently", "frequency", "rare",
-    "possible", "may", "possibly", "rapidly", "initially",
-    "slightly", "very", "highly", "barely", "slight", "high", "weak",
-    "some", "many", "few", "lots", "several", "multiple",
-    "once", "twice", "more", "multi",
 )
 
 # Reverse lookup: known category name → growth tier.
@@ -118,22 +106,10 @@ setup_logger()
 def classify_one_phenotype(df: pd.DataFrame) -> pd.DataFrame:
     """Assign Category and Growth_tier for one-phenotype genes.
 
-    When a comma‑separated segment starts with a modifier word (e.g.
-    ``some``, ``occasionally``, ``slightly``), it is treated as a
-    secondary supplement and excluded from growth‑signal detection.
-    All other comma segments are parallel growth phenotypes and are
-    kept for classification.
+    Modifier‑led comma segments are filtered out before classification
+    so that secondary descriptions do not trigger growth signals.
     """
-    def _filter_primary(text: str) -> str:
-        """Keep only comma segments that do NOT start with a modifier word."""
-        if not isinstance(text, str) or "," not in text:
-            return text
-        segments = [seg.strip() for seg in text.split(",")]
-        primary = [seg for seg in segments
-                   if not any(seg.lower().startswith(m) for m in MODIFIER_WORDS)]
-        return ", ".join(primary) if primary else segments[0]
-
-    basic = df["Basic phenotype"].apply(_filter_primary)
+    basic = df["Basic phenotype"].apply(filter_primary_segments)
     results = basic.apply(classify_growth)
     df = df.copy()
     df[["Category", "Growth_tier"]] = pd.DataFrame(
@@ -143,8 +119,13 @@ def classify_one_phenotype(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def classify_multi_phenotype(df: pd.DataFrame) -> pd.DataFrame:
-    """Assign Category and Growth_tier for multi-phenotype genes."""
-    results = df["Basic phenotype"].apply(classify_growth)
+    """Assign Category and Growth_tier for multi-phenotype genes.
+
+    Same filtering as single‑phenotype: modifier‑led segments are
+    removed, remaining segments are classified together.
+    """
+    basic = df["Basic phenotype"].apply(filter_primary_segments)
+    results = basic.apply(classify_growth)
     df = df.copy()
     df[["Category", "Growth_tier"]] = pd.DataFrame(
         results.tolist(), index=df.index
@@ -172,8 +153,8 @@ def classify_inconsistent_phenotype(
         how="left",
     ).drop(columns="SysID")
 
-    # Use Category_32 as the final category
-    df["Category"] = df["Category_32"].fillna("WT-like")
+    # Use Category_32 as the final category, normalising legacy "WT" → "WT-like"
+    df["Category"] = df["Category_32"].fillna("WT-like").replace({"WT": "WT-like"})
 
     # Derive Growth_tier from category name
     df["Growth_tier"] = df["Category"].map(CATEGORY_TO_TIER).fillna(5).astype(int)

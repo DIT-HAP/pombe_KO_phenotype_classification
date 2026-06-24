@@ -67,6 +67,9 @@ import pandas as pd
 # 3. Third-party Imports
 from loguru import logger
 
+# 4. Project Imports
+from growth_signals import count_growth_segments
+
 # =============================================================================
 # GLOBAL CONSTANTS
 # =============================================================================
@@ -77,29 +80,6 @@ DEFAULT_OUTPUT = Path("data/3_grouped_genes/Hayles_2013_OB_grouped_genes.xlsx")
 # Temperature marker used to detect consistency in phenotype descriptions
 TEMP_BOTH = "25,32"
 TEMP_32 = "32"
-
-# Modifier words — when a comma‑separated segment starts with one of these,
-# it is treated as a secondary description, not a parallel phenotype.
-MODIFIER_WORDS = (
-    # Frequency
-    "occasionally", "often", "occasional", "sometimes",
-    "mostly", "rarely", "frequently", "frequency", "rare",
-    "possible", "may", "possibly", "rapidly", "initially",
-    # Degree
-    "slightly", "very", "highly", "barely", "slight", "high", "weak",
-    # Quantity
-    "some", "many", "few", "lots", "several", "multiple",
-    "once", "twice", "more", "multi",
-)
-
-# Growth‑signal keywords (derived from growth_signals.GROWTH_SIGNALS).
-# Used to detect whether a comma‑separated segment describes a parallel
-# growth phenotype rather than a morphological supplement.
-GROWTH_KEYWORDS = (
-    "spores", "germinated", "germination", "microcolonies",
-    "small colon", "very small colon",
-    "divide", "division",
-)
 
 # =============================================================================
 # LOGGING SETUP
@@ -160,31 +140,12 @@ def split_basic_additional(desc_series: pd.Series, marker: str) -> pd.DataFrame:
 def classify_phenotype_count(phenotype: object) -> str | float:
     """Classify as ``Single`` or ``Multiple``, or NaN for non‑string input.
 
-    Rules for comma‑separated descriptions:
-    1. Segment starts with a modifier word → secondary description → Single.
-    2. Segment contains a growth‑signal keyword → parallel phenotype → Multiple.
-    3. Otherwise (morphological supplement) → Single.
-    4. No comma → Single.
+    Counts how many comma‑separated segments contain a growth signal
+    (excluding modifier‑led segments).  More than one → ``Multiple``.
     """
     if not isinstance(phenotype, str):
         return np.nan
-
-    if "," not in phenotype:
-        return "Single"
-
-    # Look at the segment after the last comma (most significant split)
-    last_segment = phenotype.strip().rsplit(",", 1)[-1].strip().lower()
-
-    # Rule 1: modifier word at the start → secondary
-    if any(last_segment.startswith(w) for w in MODIFIER_WORDS):
-        return "Single"
-
-    # Rule 2: contains growth keyword → parallel
-    if any(kw in last_segment for kw in GROWTH_KEYWORDS):
-        return "Multiple"
-
-    # Rule 3: otherwise → morphology supplement → Single
-    return "Single"
+    return "Multiple" if count_growth_segments(phenotype) > 1 else "Single"
 
 
 # =============================================================================

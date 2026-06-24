@@ -83,9 +83,70 @@ GROWTH_SIGNALS: list[GrowthSignal] = [
     GrowthSignal(keyword="spores", category="spores", tier=1),
 ]
 
+# Modifier words — when a comma‑separated segment starts with one of these,
+# it is a secondary description (modifier / morphology supplement) and is
+# excluded from growth‑signal detection.
+MODIFIER_WORDS: tuple[str, ...] = (
+    # Frequency
+    "occasionally", "often", "occasional", "sometimes",
+    "mostly", "rarely", "frequently", "frequency", "rare",
+    "possible", "may", "possibly", "rapidly", "initially",
+    # Degree
+    "slightly", "very", "highly", "barely", "slight", "high", "weak",
+    # Quantity
+    "some", "many", "few", "lots", "several", "multiple",
+    "once", "twice", "more", "multi",
+)
+
+# Growth‑signal keywords used for segment‑level analysis.
+GROWTH_KEYWORDS: tuple[str, ...] = (
+    "spores", "germinated", "germination", "microcolonies",
+    "small colon", "very small colon",
+    "divide", "division",
+)
+
 # =============================================================================
 # CORE LOGIC
 # =============================================================================
+
+
+def _is_modifier_segment(seg: str) -> bool:
+    """Return True if *seg* starts with a modifier word."""
+    sl = seg.lower().strip()
+    return any(sl.startswith(m) for m in MODIFIER_WORDS)
+
+
+def _has_growth_signal(seg: str) -> bool:
+    """Return True if *seg* contains a growth‑signal keyword."""
+    sl = seg.lower()
+    return any(kw in sl for kw in GROWTH_KEYWORDS)
+
+
+def filter_primary_segments(text: str) -> str:
+    """Remove modifier‑led comma segments, keep the rest.
+
+    A comma‑separated segment that starts with a modifier word (e.g.
+    ``some``, ``occasionally``, ``slightly``) is treated as a secondary
+    description and excluded.  All other segments — whether they contain
+    growth signals or pure morphology — are kept for classification.
+
+    If every segment is modifier‑led, the first segment is returned as a
+    fallback so the description is never empty.
+    """
+    if not isinstance(text, str) or "," not in text:
+        return text
+    segments = [seg.strip() for seg in text.split(",")]
+    primary = [seg for seg in segments if not _is_modifier_segment(seg)]
+    return ", ".join(primary) if primary else segments[0]
+
+
+def count_growth_segments(text: str) -> int:
+    """Count comma segments that contain a growth signal (excluding modifier‑led ones)."""
+    if not isinstance(text, str) or "," not in text:
+        return 1 if (isinstance(text, str) and _has_growth_signal(text)) else 0
+    segments = [seg.strip() for seg in text.split(",")]
+    return sum(1 for seg in segments
+               if not _is_modifier_segment(seg) and _has_growth_signal(seg))
 
 
 def _has_standalone_spores(text: str) -> bool:
