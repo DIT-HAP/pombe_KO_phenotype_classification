@@ -7,11 +7,11 @@ three critical layers of the pipeline:
 2. **Segment filtering** — `growth_signals.filter_primary_segments()`
 3. **Single/Multiple classification** — `classify_phenotype_count()`
 
-All 77 tests pass:
+All 78 tests pass:
 
 ```
 mamba run -n bioinformatics python -m pytest tests/ -v
-77 passed in 0.21s
+78 passed in 0.26s
 ```
 
 ---
@@ -41,7 +41,7 @@ what `(category, tier)` pair is returned?
 | `ESSENTIAL germinated spores` | germinated | 2 |
 | `ESSENTIAL germinated spores long` | germinated | 2 |
 | `VIABLE germination at 25` | germinated | 2 |
-| `VIABLE WT cells, some germination long` | germinated | 2 |
+| `VIABLE WT cells, some germination long` | germinated | 2 | — raw `classify_growth` scan |
 | `ESSENTIAL germinated spores divide` | germinated and divided | 2 |
 | `ESSENTIAL germinated spores division` | germinated and divided | 2 |
 | `germinated spores divides once` | germinated and divided | 2 |
@@ -149,6 +149,7 @@ description and is dropped. All other segments are kept.
 | `VIABLE misshapen cells` (no comma, only morphology) | Single | 0 signals |
 | `ESSENTIAL spores` (no comma) | Single | 1 signal |
 | `ESSENTIAL microcolonies` (no comma) | Single | 1 signal |
+| `VIABLE WT cells, some germination long` → `filter_primary` → `"VIABLE WT cells"` → `classify_growth` | **WT-like** (tier 5) | Pipeline integration: `some` is modifier → dropped |
 
 ### Constant integrity checks
 
