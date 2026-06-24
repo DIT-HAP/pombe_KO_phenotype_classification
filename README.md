@@ -34,21 +34,22 @@ pombe_KO_phenotype_classification/
 │   ├── raw/                read-only. the original supplementary table.
 │   │   └── rsob130053supp2.xlsx
 │   ├── 1_formatted/        formatted phenotype descriptions
-│   ├── 2_phenotype_description_keyword_analysis/
-|   ├── 2_grouped_genes/
-|   ├── 3_categorized_genes/
-|   ├── 4_merged_categories/
+│   ├── 2_keyword_profile/  keyword-level analysis per Growth_tier
+│   ├── 3_grouped_genes/    grouped by phenotype consistency
+│   ├── 4_categorized_genes/ categorized phenotypes + inspection pivots
+│   ├── 5_merged_categories/ final merged table + summaries
 │   └── previous_manual_check_of_insistent_phenotypes/
 ├── results/
 │   └── Hayles_2013_OB_merged_categories.xlsx
 └── src/
-    ├── script_flow.sh                    pipeline entry point
-    ├── format_phenotype_input.py
-    ├── phenotype_description_keyword_analysis.py
-    ├── 02_group_genes.py
-    ├── 03_categorize_phenotypes.py
-    ├── 04_merge_categories.py
-    └── script_flow.sh
+    ├── 00_download_pombase_annotation.py
+    ├── 01_format_and_update_ids.py
+    ├── 02_keyword_profile.py
+    ├── 03_group_genes.py
+    ├── 04_categorize_phenotypes.py
+    ├── 05_merge_categories.py
+    ├── growth_signals.py             shared signal-detection engine
+    └── script_flow.sh               pipeline entry point
 ```
 
 ## Pipeline
@@ -57,9 +58,11 @@ Scripts run in this order:
 
 1. **00_download_pombase_annotation.py** — downloads the PomBase gene annotation
 2. **01_format_and_update_ids.py** — formats raw data and updates systematic IDs
-3. **02_group_genes.py** — groups genes by phenotype consistency at different temperatures
-4. **03_categorize_phenotypes.py** — categorises growth phenotypes using signal-based detection
-5. **04_merge_categories.py** — merges the three classification branches into one output
+3. **02_keyword_profile.py** — keyword-level analysis validating word categories
+   (growth signals, morphology, modifiers) per Growth_tier
+4. **03_group_genes.py** — groups genes by phenotype consistency at different temperatures
+5. **04_categorize_phenotypes.py** — categorises growth phenotypes using signal-based detection
+6. **05_merge_categories.py** — merges the three classification branches into one output
 
 Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx`.
 
@@ -69,10 +72,10 @@ Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx`.
 - Created this README
 - Moved raw data from `data/0_raw/` → `data/raw/` (the `0_` prefix was unnecessary)
 - Wrote `.gitignore` covering `data/`, `tmp/`, Python/Jupyter artifacts, macOS system files
-
-## Still to do
-
-- Rename the other data subdirectories (2_phenotype_description_keyword_analysis → keywords, etc.)
-- Add numbered prefixes to script filenames so the execution order is obvious
+- Renamed all data subdirectories and scripts with numbered prefixes matching pipeline order
+- Implemented signal-based growth phenotype classification engine (`growth_signals.py`)
+- Built keyword profiling analysis (`02_keyword_profile.py`) with 9-category word taxonomy
+- Created test suite (`tests/`) with 78 tests covering signal engine, segment filtering, and Single/Multiple classification
+- Documentation for each pipeline step in `docs/`
 - Decide what to do about the `results/` vs `data/5_merged_categories/` duplication
 - Any further restructuring or refactoring of the classification logic
