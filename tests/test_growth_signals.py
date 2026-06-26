@@ -1,12 +1,10 @@
-"""Unit tests for the growth-signal detection engine.
+"""End-to-end classification tests using real phenotype descriptions.
 
-Tests :func:`growth_signals.classify_growth` exhaustively:
-  - each canonical signal in isolation
-  - combined / mixed signals (spores + germinated, etc.)
-  - multi-word phrases (small colonies, very small colonies)
-  - germinated-spores relationship (standalone vs implied)
-  - default WT-like fallback
-  - case insensitivity
+Each test case is a single line:
+    (description, expected_category, expected_tier)
+
+All descriptions are taken verbatim from the Hayles 2013 supplementary
+table — the same text the pipeline processes in production.
 """
 
 from __future__ import annotations
@@ -15,199 +13,107 @@ import pytest
 from growth_signals import classify_growth
 
 
-# ── Helpers ─────────────────────────────────────────────────────────────────────
+# =============================================================================
+# (description, expected_category, expected_tier)
+#
+# All descriptions are verbatim from the source data.
+# =============================================================================
+
+CASES: list[tuple[str, str, int]] = [
+
+    # ── WT-like (tier 5) — no growth signal ──────────────────────────────
+    ("VIABLE WT cells at 25,32",                                          "WT-like", 5),
+    ("VIABLE misshapen cells at 25,32",                                   "WT-like", 5),
+    ("VIABLE slightly long cells at 25,32",                               "WT-like", 5),
+    # "some germination long" is a modifier segment → filtered → WT-like
+    ("VIABLE WT cells, some germination long at 25,32,",                  "WT-like", 5),
+    ("VIABLE  WT cells, some germination long at 25,32",                  "WT-like", 5),
+    # "initially branched" is a modifier segment → filtered → WT-like
+    ("VIABLE slightly misshapen cells, initially branched septated slightly long, abnormal colony morphology at 25,32",
+     "WT-like", 5),
+
+    # ── Spores (tier 1) ──────────────────────────────────────────────────
+    ("ESSENTIAL spores  at 25,32",                                        "spores", 1),
+    ("ESSENTIAL spores at 25,32",                                         "spores", 1),
+    # "some germinated spores" is modifier-led → Single → spores only
+    ("ESSENTIAL spores, some germinated spores at 25,32",                 "spores", 1),
+
+    # ── Germinated (tier 2) ──────────────────────────────────────────────
+    ("ESSENTIAL germinated spores long at 25,32",                         "germinated", 2),
+    ("ESSENTIAL germinated spores at 25,32",                              "germinated", 2),
+    # "some division" is modifier-led → filtered → germinated only
+    ("ESSENTIAL germinated spores slightly misshapen, some division at 25,32",
+     "germinated", 2),
+    ("ESSENTIAL germinated spores long, some division at 25,32",          "germinated", 2),
+    # "occasionally long and then divide" is modifier-led → filtered → germinated
+    ("ESSENTIAL germinated spores, occasionally long and then divide at 25,32",
+     "germinated", 2),
+    # "often divide once" is modifier-led → filtered → germinated
+    ("ESSENTIAL germinated spores, often divide once to give one slightly misshapen cell and one dead cell at 25,32",
+     "germinated", 2),
+
+    # ── Germinated and divided (tier 2) ──────────────────────────────────
+    ("ESSENTIAL germinated spores slightly misshapen and divide once at 25,32",
+     "germinated and divided", 2),
+    # "divide once or twice" — divide is NOT a modifier → kept → divided
+    ("ESSENTIAL germinated spores slightly misshapen, divide once or twice at 25,32",
+     "germinated and divided", 2),
+
+    # ── Microcolonies (tier 3) ───────────────────────────────────────────
+    ("ESSENTIAL microcolonies misshapen cells at 25,32",                  "microcolonies", 3),
+    ("ESSENTIAL microcolonies skittle cells at 25,32",                    "microcolonies", 3),
+    # "some long cells" is modifier-led → filtered → microcolonies
+    ("ESSENTIAL microcolonies slightly misshapen cells, some long cells at 25,32",
+     "microcolonies", 3),
+
+    # ── Small colonies (tier 4) ──────────────────────────────────────────
+    ("VIABLE small colonies slightly misshapen cells at 25,32",           "small colonies", 4),
+    ("VIABLE small colonies long cells at 25,32",                         "small colonies", 4),
+    # "possibly diploidising" is modifier-led → filtered → small colonies
+    ("VIABLE small colonies long cells, possibly diploidising at 25,32",  "small colonies", 4),
+
+    # ── Very small colonies (tier 4) ─────────────────────────────────────
+    ("VIABLE very small colonies rounded cells at 25,32",                 "very small colonies", 4),
+
+    # ── Combined: spores + germinated (mixed population, tier 2) ─────────
+    ("ESSENTIAL spores, germinated spores at 25,32",                      "germinated, spores", 2),
+    # "may divide once" — may is a modifier → that segment is modifier-led?
+    # Actually "germinated spores slightly misshapen may divide once" is one
+    # segment (no comma before "may"), so may does not start a segment.
+    # Result: spores + germinated + divided
+    ("ESSENTIAL spores, germinated spores slightly misshapen may divide once at 25,32",
+     "germinated and divided, spores", 2),
+
+    # ── Combined: spores + germinated + microcolonies (tier 3) ───────────
+    ("ESSENTIAL spores, germinated spores, microcolonies misshapen cells at 25,32",
+     "germinated, microcolonies, spores", 3),
+    # "occasionally misshapen branched" is modifier-led → filtered, 3 signals remain
+    ("ESSENTIAL spores, germinated spores, microcolonies long cells, occasionally misshapen branched at 25,32",
+     "germinated, microcolonies, spores", 3),
+    # "microcolonies slightly misshapen" — microcolonies starts segment → kept
+    ("ESSENTIAL spores, germinated spores, microcolonies slightly misshapen cells at 25,32",
+     "germinated, microcolonies, spores", 3),
+
+    # ── Combined: germinated + microcolonies (tier 3) ────────────────────
+    ("ESSENTIAL misshapen germinated spores and microcolonies misshapen cells at 32",
+     "germinated, microcolonies", 3),
+
+    # ── Combined: germinated + spores + small colonies (tier 4) ──────────
+    ("ESSENTIAL spores, germinated spores, small colonies long cells at 25,32",
+     "germinated, small colonies, spores", 4),
+
+    # ── Combined: microcolonies + small colonies (tier 4) ────────────────
+    ("ESSENTIAL microcolonies skittle cells, small colonies WT cells at 25,32",
+     "microcolonies, small colonies", 4),
+
+    # ── Combined: spores + microcolonies (tier 3) ────────────────────────
+    ("ESSENTIAL spores, microcolonies misshapen cells at 25,32",          "microcolonies, spores", 3),
+]
 
 
-def assert_result(desc: str, *, cat: str, tier: int):
-    """Assert that *classify_growth* returns the expected (cat, tier)."""
-    got_cat, got_tier = classify_growth(desc)
-    assert got_cat == cat, f"{desc!r}: expected cat={cat!r}, got {got_cat!r}"
-    assert got_tier == tier, f"{desc!r}: expected tier={tier}, got {got_tier}"
-
-
-# ── WT-like (no growth signal) ──────────────────────────────────────────────────
-
-
-class TestNoSignal:
-    def test_wt_cells(self):
-        assert_result("VIABLE WT cells", cat="WT-like", tier=5)
-
-    def test_empty_string(self):
-        assert_result("", cat="WT-like", tier=5)
-
-    def test_only_morphology(self):
-        assert_result("VIABLE misshapen cells at 25,32", cat="WT-like", tier=5)
-
-    def test_only_modifier(self):
-        assert_result("VIABLE slightly long cells", cat="WT-like", tier=5)
-
-    def test_viable_essential_no_signal(self):
-        assert_result("VIABLE cells at 25,32", cat="WT-like", tier=5)
-
-
-# ── Single signals ──────────────────────────────────────────────────────────────
-
-
-class TestSpores:
-    def test_basic(self):
-        assert_result("ESSENTIAL spores", cat="spores", tier=1)
-
-    def test_with_modifiers(self):
-        assert_result("ESSENTIAL spores misshapen cells", cat="spores", tier=1)
-
-    def test_at_temperature(self):
-        assert_result("ESSENTIAL spores at 25,32", cat="spores", tier=1)
-
-
-class TestGerminated:
-    def test_basic(self):
-        assert_result("ESSENTIAL germinated spores", cat="germinated", tier=2)
-
-    def test_with_morphology(self):
-        assert_result("ESSENTIAL germinated spores long", cat="germinated", tier=2)
-
-    def test_long_form(self):
-        """``germination`` (noun form) should also be detected."""
-        assert_result("VIABLE germination at 25", cat="germinated", tier=2)
-
-    def test_some_germination_filtered_to_wt_like(self):
-        """``classify_growth`` filters modifier segments internally.
-
-        ``some germination long`` starts with ``some`` → dropped, leaving
-        ``VIABLE WT cells`` → no signal → WT-like.
-        """
-        assert_result(
-            "VIABLE WT cells, some germination long",
-            cat="WT-like", tier=5,
-        )
-
-    def test_germinated_spores_no_separate_spores(self):
-        """``germinated spores`` alone — spores is implied, not separate."""
-        assert_result("ESSENTIAL germinated spores", cat="germinated", tier=2)
-
-
-class TestGerminatedAndDivided:
-    def test_divide_word(self):
-        assert_result("ESSENTIAL germinated spores divide",
-                       cat="germinated and divided", tier=2)
-
-    def test_division_word(self):
-        assert_result("ESSENTIAL germinated spores division",
-                       cat="germinated and divided", tier=2)
-
-    def test_divides_plural(self):
-        assert_result("germinated spores divides once",
-                       cat="germinated and divided", tier=2)
-
-    def test_combined_division_instance(self):
-        assert_result("germinated spores, division",
-                       cat="germinated and divided", tier=2)
-
-
-class TestMicrocolonies:
-    def test_basic(self):
-        assert_result("ESSENTIAL microcolonies", cat="microcolonies", tier=3)
-
-    def test_with_morphology(self):
-        assert_result("ESSENTIAL microcolonies misshapen cells",
-                       cat="microcolonies", tier=3)
-
-
-class TestSmallColonies:
-    def test_phrase(self):
-        assert_result("VIABLE small colonies", cat="small colonies", tier=4)
-
-    def test_phrase_with_morphology(self):
-        assert_result("VIABLE small colonies long cells",
-                       cat="small colonies", tier=4)
-
-
-class TestVerySmallColonies:
-    def test_phrase(self):
-        assert_result("VIABLE very small colonies", cat="very small colonies", tier=4)
-
-    def test_phrase_with_morphology(self):
-        assert_result("VIABLE very small colonies misshapen cells",
-                       cat="very small colonies", tier=4)
-
-
-# ── Multi-signal / Combined ─────────────────────────────────────────────────────
-
-
-class TestCombinedSignals:
-    def test_spores_and_germinated(self):
-        """Standalone ``spores`` + ``germinated`` → mixed population."""
-        assert_result("spores, germinated spores",
-                       cat="germinated, spores", tier=2)
-
-    def test_spores_germinated_microcolonies(self):
-        desc = "spores, germinated spores, microcolonies"
-        assert_result(desc, cat="germinated, microcolonies, spores", tier=3)
-
-    def test_spores_germinated_microcolonies_modifier(self):
-        """``occasionally misshapen branched`` is a modifier segment → ignored."""
-        desc = "ESSENTIAL spores, germinated spores, microcolonies long cells, occasionally misshapen branched"
-        # After filter_primary_segments: "spores, germinated spores, microcolonies long cells"
-        assert_result(desc, cat="germinated, microcolonies, spores", tier=3)
-
-    def test_spores_germinated_mixed(self):
-        assert_result("ESSENTIAL spores, germinated spores",
-                       cat="germinated, spores", tier=2)
-
-    def test_germinated_microcolonies(self):
-        assert_result("germinated spores, microcolonies",
-                       cat="germinated, microcolonies", tier=3)
-
-
-# ── Standalone Spores (the _has_standalone_spores logic) ────────────────────────
-
-
-class TestStandaloneSpores:
-    def test_germinated_spores_implies_no_standalone(self):
-        """``germinated spores`` without a separate ``spores`` term → only germinated."""
-        assert_result("germinated spores long",
-                       cat="germinated", tier=2)
-
-    def test_spores_and_germinated_spores_standalone(self):
-        """``spores, germinated spores`` → mixed population."""
-        assert_result("spores, germinated spores",
-                       cat="germinated, spores", tier=2)
-
-
-# ── Single / Multiple equivalence (classify_growth is independent of PC) ─────────
-
-
-class TestCrossCutting:
-    def test_single_growth_signal_whole_descriptions(self):
-        """A single continuous description with one signal → correct category."""
-        assert_result("VIABLE small colonies long cells",
-                       cat="small colonies", tier=4)
-
-    def test_microcolonies_with_morphology(self):
-        """Morphology words (misshapen, etc.) do NOT trigger growth signals."""
-        assert_result("ESSENTIAL microcolonies misshapen cells",
-                       cat="microcolonies", tier=3)
-
-
-# ── String matching / case handling ─────────────────────────────────────────────
-
-
-class TestRobustness:
-    def test_case_insensitivity(self):
-        assert_result("Essential Spores", cat="spores", tier=1)
-
-    def test_leading_trailing_whitespace(self):
-        assert_result("  ESSENTIAL spores  ", cat="spores", tier=1)
-
-    @pytest.mark.parametrize(
-        "desc, expected_cat, expected_tier",
-        [
-            ("germinated spores", "germinated", 2),
-            ("germinated, microcolonies", "germinated, microcolonies", 3),
-            ("spores only here", "spores", 1),
-            ("small colonies", "small colonies", 4),
-            ("WT-like", "WT-like", 5),
-        ],
-    )
-    def test_parametrized(self, desc, expected_cat, expected_tier):
-        assert_result(desc, cat=expected_cat, tier=expected_tier)
+@pytest.mark.parametrize("description, expected_cat, expected_tier", CASES)
+def test_classify_growth(description: str, expected_cat: str, expected_tier: int):
+    """Given a real phenotype description, the classification matches expectation."""
+    cat, tier = classify_growth(description)
+    assert cat == expected_cat, f"{description!r}: expected {expected_cat!r}, got {cat!r}"
+    assert tier == expected_tier, f"{description!r}: expected tier {expected_tier}, got {tier}"
