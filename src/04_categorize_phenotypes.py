@@ -325,24 +325,58 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------
-    # 4c. Flat inspection table — one row per gene, no counts
+    # 4c. Flat inspection table — one row per unique description + gene count
     # ------------------------------------------------------------------
     logger.info("Building flat inspection table…")
-    flat_inspection = all_genes[
+    flat_full = all_genes[
         [
             "Deletion mutant phenotype description",
             "Category",
             "Phenotype_count",
             "Growth_tier",
+            "Consistency_25_32",
         ]
     ].copy()
-    flat_inspection.rename(
+
+    # Count genes per (description, Category, Phenotype_count, Growth_tier, Consistency)
+    gene_counts = (
+        flat_full.groupby(
+            [
+                "Deletion mutant phenotype description",
+                "Category",
+                "Phenotype_count",
+                "Growth_tier",
+                "Consistency_25_32",
+            ]
+        )
+        .size()
+        .rename("Gene count")
+        .reset_index()
+    )
+
+    flat_inspection = gene_counts.rename(
         columns={
             "Deletion mutant phenotype description": "Phenotype description",
             "Phenotype_count": "Single/Multiple/Temp_mismatch",
-        },
+        }
+    )
+    # Column order: description, Category, S/M/T, Consistency, Growth_tier, Gene count
+    flat_inspection = flat_inspection[
+        [
+            "Phenotype description",
+            "Category",
+            "Single/Multiple/Temp_mismatch",
+            "Consistency_25_32",
+            "Growth_tier",
+            "Gene count",
+        ]
+    ]
+    flat_inspection.sort_values(
+        by=["Category", "Single/Multiple/Temp_mismatch", "Growth_tier", "Gene count"],
+        ascending=[True, True, True, False],
         inplace=True,
     )
+    flat_inspection.reset_index(drop=True, inplace=True)
 
     # ------------------------------------------------------------------
     # 5. Save
