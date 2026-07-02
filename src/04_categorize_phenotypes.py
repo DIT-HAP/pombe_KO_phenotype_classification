@@ -59,7 +59,7 @@ import pandas as pd
 from loguru import logger
 
 # 3b. Local module
-from growth_signals import GROWTH_SIGNALS, classify_growth, filter_primary_segments
+from growth_signals import GROWTH_SIGNALS, classify_growth
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -106,11 +106,11 @@ setup_logger()
 def classify_one_phenotype(df: pd.DataFrame) -> pd.DataFrame:
     """Assign Category and Growth_tier for one-phenotype genes.
 
-    Modifier‑led comma segments are filtered out before classification
-    so that secondary descriptions do not trigger growth signals.
+    ``classify_growth`` handles modifier‑led segments internally —
+    primary signals get plain names, modifier‑led signals get prefixed
+    names (e.g. ``often divided``).
     """
-    basic = df["Basic phenotype"].apply(filter_primary_segments)
-    results = basic.apply(classify_growth)
+    results = df["Basic phenotype"].apply(classify_growth)
     df = df.copy()
     df[["Category", "Growth_tier"]] = pd.DataFrame(
         results.tolist(), index=df.index
@@ -119,13 +119,8 @@ def classify_one_phenotype(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def classify_multi_phenotype(df: pd.DataFrame) -> pd.DataFrame:
-    """Assign Category and Growth_tier for multi-phenotype genes.
-
-    Same filtering as single‑phenotype: modifier‑led segments are
-    removed, remaining segments are classified together.
-    """
-    basic = df["Basic phenotype"].apply(filter_primary_segments)
-    results = basic.apply(classify_growth)
+    """Assign Category and Growth_tier for multi-phenotype genes."""
+    results = df["Basic phenotype"].apply(classify_growth)
     df = df.copy()
     df[["Category", "Growth_tier"]] = pd.DataFrame(
         results.tolist(), index=df.index
@@ -330,6 +325,26 @@ def main() -> int:
     )
 
     # ------------------------------------------------------------------
+    # 4c. Flat inspection table — one row per gene, no counts
+    # ------------------------------------------------------------------
+    logger.info("Building flat inspection table…")
+    flat_inspection = all_genes[
+        [
+            "Deletion mutant phenotype description",
+            "Category",
+            "Phenotype_count",
+            "Growth_tier",
+        ]
+    ].copy()
+    flat_inspection.rename(
+        columns={
+            "Deletion mutant phenotype description": "Phenotype description",
+            "Phenotype_count": "Single/Multiple/Temp_mismatch",
+        },
+        inplace=True,
+    )
+
+    # ------------------------------------------------------------------
     # 5. Save
     # ------------------------------------------------------------------
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -354,6 +369,11 @@ def main() -> int:
         output_path.stem.replace("_categorized", "_inspection") + output_path.suffix,
     )
     with pd.ExcelWriter(inspection_path) as writer:
+        # Flat inspection table first — most useful for manual review
+        flat_inspection.to_excel(
+            writer, sheet_name="Flat inspection", index=False,
+        )
+
         for sheet_name, pivot_df in pivots.items():
             safe_name = sheet_name[:31]
             pivot_df.to_excel(writer, sheet_name=safe_name)
@@ -363,7 +383,8 @@ def main() -> int:
             writer, sheet_name="Multi-level pivot (All genes)",
         )
 
-    logger.success(f"Inspection pivots saved: {inspection_path}  ({len(pivots) + 1} sheets)")
+    n_sheets = 1 + len(pivots) + 1
+    logger.success(f"Inspection pivots saved: {inspection_path}  ({n_sheets} sheets)")
     return 0
 
 

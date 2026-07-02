@@ -76,7 +76,9 @@ GROWTH_SIGNALS: list[GrowthSignal] = [
     GrowthSignal(keyword="microcolonies", category="microcolonies", tier=3),
     # tier 2
     GrowthSignal(keyword="germinated", category="germinated", tier=2),
-    GrowthSignal(keyword="germination", category="germinated", tier=2),
+    # Note: "germination" (noun) is NOT a growth signal — in the data it
+    # only appears in morphological contexts ("germination long", "poor
+    # germination", "from germination"), never as a standalone growth state.
     GrowthSignal(keyword="divide", category="germinated and divided", tier=2),
     GrowthSignal(keyword="division", category="germinated and divided", tier=2),
     # tier 1
@@ -100,7 +102,7 @@ MODIFIER_WORDS: tuple[str, ...] = (
 
 # Growth‑signal keywords used for segment‑level analysis.
 GROWTH_KEYWORDS: tuple[str, ...] = (
-    "spores", "germinated", "germination", "microcolonies",
+    "spores", "germinated", "microcolonies",
     "small colon", "very small colon",
     "divide", "division",
 )
@@ -165,57 +167,128 @@ def _has_standalone_spores(text: str) -> bool:
     return False
 
 
+def _detect_segment_signals(seg: str) -> list[GrowthSignal]:
+    """Return all growth signals found in *seg*."""
+    sl = seg.lower()
+    return [s for s in GROWTH_SIGNALS if s.keyword in sl]
+
+
+def _get_modifier_prefix(seg: str) -> str | None:
+    """If *seg* starts with a modifier word, return that word; else None."""
+    sl = seg.lower().strip()
+    for m in MODIFIER_WORDS:
+        if sl.startswith(m):
+            return m
+    return None
+
+
+def _signal_to_name(signal: GrowthSignal, modifier: str | None) -> str:
+    """Convert a signal + modifier into a category name.
+
+    - No modifier → plain signal category (e.g. ``germinated``).
+    - With modifier → prefixed (e.g. ``some germinated``, ``often divided``).
+    """
+    if modifier is None:
+        return signal.category
+    # "germinated and divided" → "often divided" (germinated already implied)
+    if signal.category == "germinated and divided":
+        return f"{modifier} divided"
+    return f"{modifier} {signal.category}"
+
+
 def classify_growth(description: str) -> tuple[str, int]:
     """Return (category, growth_tier) for a phenotype description string.
 
-    Detects all growth signals present in the description, composes their
-    category names (sorted, deduplicated), and assigns the worst (lowest)
-    tier. If no signals are found, returns ``("WT-like", 5)``.
+    The description is split into comma segments.  Each segment is scanned
+    for growth signals:
 
-    Modifier‑led comma segments (e.g. ``some germination long``) are
-    filtered out before detection so that secondary descriptions do not
-    trigger growth signals.
+    - **Primary segments** (not starting with a modifier) contribute plain
+      signal names (e.g. ``germinated``, ``spores``).
+    - **Modifier‑led segments** (starting with ``some``, ``often``, etc.)
+      contribute prefixed signal names (e.g. ``some germinated``,
+      ``often divided``) so that low‑frequency events are distinguished
+      from definitive ones.
+
+    If a signal appears in both a primary and a modifier-led segment, the
+    plain (primary) version is kept — the definitive occurrence dominates.
+
+    Tier is the best (highest) tier among all matched signals.  If no
+    signals are found, returns ``("WT-like", 5)``.
     """
-    filtered = filter_primary_segments(description)
-    desc_lower = filtered.lower()
+    if not isinstance(description, str):
+        return ("WT-like", 5)
 
-    # Collect all matching signals
+    desc_lower = description.lower()
+    segments = [seg.strip() for seg in description.split(",")]
+
     matched: list[GrowthSignal] = []
-    for signal in GROWTH_SIGNALS:
-        if signal.keyword in desc_lower:
-            matched.append(signal)
+    primary_cats: set[str] = set()    # plain signal names from primary segments
+    modifier_cats: set[str] = set()   # prefixed names from modifier-led segments
 
-    # No growth signal → WT
+    for seg in segments:
+        seg_signals = _detect_segment_signals(seg)
+        if not seg_signals:
+            continue
+        mod = _get_modifier_prefix(seg)
+        for s in seg_signals:
+            matched.append(s)
+            name = _signal_to_name(s, mod)
+            if mod is None:
+                primary_cats.add(name)
+            else:
+                modifier_cats.add(name)
+
+    # No growth signal → WT-like
     if not matched:
         return ("WT-like", 5)
 
-    # Compose unique category names sorted alphabetically
-    unique_categories: list[str] = sorted({s.category for s in matched})
+    # Merge: primary always wins over modifier for the same base signal.
+    # Track which base signals already have a plain (primary) entry.
+    primary_bases: set[str] = set()
+    for seg in segments:
+        if _get_modifier_prefix(seg) is not None:
+            continue
+        for s in _detect_segment_signals(seg):
+            primary_bases.add(s.category)
 
-    # Post-process: remove redundant broader categories when a more specific
-    # one is already present.
-    # Priority order matters: check spores/germinated relation BEFORE
-    # germinated/germinated-and-divided substitution.
+    all_cats: set[str] = set(primary_cats)
+    for mcat in modifier_cats:
+        # Extract base signal name by removing modifier prefix
+        base = mcat
+        for mod_word in MODIFIER_WORDS:
+            if mcat.startswith(mod_word + " "):
+                base = mcat[len(mod_word) + 1:]
+                break
+        # Map "divided" back to "germinated and divided" for comparison
+        if base == "divided":
+            base = "germinated and divided"
+        if base not in primary_bases:
+            all_cats.add(mcat)
+
+    unique_categories: list[str] = sorted(all_cats)
+
+    # Post-process: remove redundant broader categories
 
     # 1. "spores" is implied by "germinated" when it only appears as part of
-    #    the phrase "germinated spores" (i.e. no standalone spores).
-    #    Check this BEFORE germinated→germinated and divided substitution.
+    #    "germinated spores" (i.e. no standalone spores).
     has_germinated = any("germinated" in cat for cat in unique_categories)
     if "spores" in unique_categories and has_germinated:
         if not _has_standalone_spores(desc_lower):
             unique_categories.remove("spores")
 
-    # 2. "germinated" is implied by "germinated and divided"
-    if "germinated and divided" in unique_categories and "germinated" in unique_categories:
+    # 2. "germinated" is implied by any "divided" variant
+    germinated_variants = {
+        c for c in unique_categories
+        if "divided" in c and "germinated" in c
+    }
+    if germinated_variants and "germinated" in unique_categories:
         unique_categories.remove("germinated")
+
     # 3. "small colonies" is implied by "very small colonies"
     if "very small colonies" in unique_categories and "small colonies" in unique_categories:
         unique_categories.remove("small colonies")
 
-    # Assign growth tier: for composite phenotypes, use the BEST (highest)
-    # tier among matched signals. This represents the most advanced growth
-    # stage the gene can support — the informative endpoint, not the worst.
-    # Single-signal descriptions use their own tier.
+    # Assign growth tier: best (highest) tier among matched signals
     growth_tier = max(s.tier for s in matched)
 
     composed = ", ".join(unique_categories)
