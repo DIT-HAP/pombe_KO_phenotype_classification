@@ -148,8 +148,13 @@ def classify_inconsistent_phenotype(
         how="left",
     ).drop(columns="SysID")
 
-    # Use Category_32 as the final category, normalising legacy "WT" → "WT-like"
-    df["Category"] = df["Category_32"].fillna("WT-like").replace({"WT": "WT-like"})
+    # Use Category_32 as the final category, normalising legacy names
+    df["Category"] = (
+        df["Category_32"]
+        .fillna("WT-like")
+        .replace({"WT": "WT-like"})
+        .str.replace("germinated spores", "germinated", regex=False)
+    )
 
     # Derive Growth_tier from category name
     df["Growth_tier"] = df["Category"].map(CATEGORY_TO_TIER).fillna(5).astype(int)

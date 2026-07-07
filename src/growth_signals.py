@@ -265,18 +265,13 @@ def classify_growth(description: str) -> tuple[str, int]:
         if base not in primary_bases:
             all_cats.add(mcat)
 
-    # Sort categories: primary (non-modifier) first by tier ascending,
-    # then modifier-led categories after their primary counterpart.
-    # e.g. "spores" (tier 1) before "germinated" (tier 2);
-    #      "spores" before "some germinated" (modifier-led, secondary).
-    # Map each category back to its base signal's tier for sorting.
-    # Build a lookup: category_name → sort_key (tier, is_modifier)
+    # Sort categories: primary (non-modifier) first, then modifier-led.
+    # Within each group, sort by tier ascending (more severe first).
     cat_sort_key: dict[str, tuple[int, int]] = {}
     for s in GROWTH_SIGNALS:
-        cat_sort_key[s.category] = (s.tier, 0)
+        cat_sort_key[s.category] = (0, s.tier)  # (is_modifier, tier)
     for cat in all_cats:
         if cat not in cat_sort_key:
-            # Modifier-prefixed category — find its base
             base = cat
             for mod_word in MODIFIER_WORDS:
                 if cat.startswith(mod_word + " "):
@@ -287,9 +282,19 @@ def classify_growth(description: str) -> tuple[str, int]:
             base_tier = next(
                 (s.tier for s in GROWTH_SIGNALS if s.category == base), 5
             )
-            cat_sort_key[cat] = (base_tier, 1)
+            cat_sort_key[cat] = (1, base_tier)  # (is_modifier, tier)
 
-    unique_categories: list[str] = sorted(all_cats, key=lambda c: cat_sort_key.get(c, (5, 1)))
+    # When all categories are modifier-led (no primary), the most severe
+    # (lowest tier) modifier signal is the "primary" — promote it.
+    has_primary = any(cat_sort_key[c][0] == 0 for c in all_cats)
+    if not has_primary:
+        min_tier = min(cat_sort_key[c][1] for c in all_cats)
+        for c in all_cats:
+            if cat_sort_key[c][1] == min_tier:
+                cat_sort_key[c] = (0, min_tier)  # promote to primary
+                break
+
+    unique_categories: list[str] = sorted(all_cats, key=lambda c: cat_sort_key.get(c, (1, 5)))
 
     # Post-process: remove redundant broader categories
 
