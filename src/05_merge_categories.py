@@ -36,6 +36,7 @@ import sys
 from pathlib import Path
 
 # 2. Data Processing Imports
+import numpy as np
 import pandas as pd
 
 # 3. Third-party Imports
@@ -53,6 +54,12 @@ DEFAULT_OUTPUT = Path(
 )
 DEFAULT_RESULTS = Path(
     "results/Hayles_2013_OB_merged_categories.xlsx"
+)
+DEFAULT_REVISED = Path(
+    "data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx"
+)
+DEFAULT_DIT_HAP = Path(
+    "data/references/all_coding_genes_with_DIT_HAP_clustering.tsv"
 )
 
 # =============================================================================
@@ -91,6 +98,60 @@ def load_and_concat(input_path: Path) -> pd.DataFrame:
     return merged
 
 
+def apply_category_merge(
+    merged: pd.DataFrame,
+    revised_path: Path,
+    dit_hap_path: Path,
+) -> pd.DataFrame:
+    """Rename fine-grained Category to Sub_category and apply revised merges.
+
+    The revised file maps original description → revised Category.
+    Genes whose description is not in the revised file keep their original
+    Category as the merged Category.
+
+    Growth_tier is reassigned based on the DR median of each merged Category,
+    ranked from highest median (tier 1) to lowest (tier N).
+    """
+    # 1. Rename old fine-grained Category → Sub_category
+    merged = merged.rename(columns={"Category": "Sub_category"})
+
+    # 2. Load revised mapping: description → revised category
+    rev = pd.read_excel(revised_path, sheet_name="Flat inspection")
+    rev_map: dict[str, str] = {}
+    for _, r in rev[rev["Revised"].notna()].iterrows():
+        rev_map[r["Phenotype description"]] = str(r["Revised"])
+
+    # 3. Apply: if description is in rev_map, use revised; else use Sub_category
+    desc_col = "Deletion mutant phenotype description"
+    merged["Category"] = merged[desc_col].map(rev_map).fillna(merged["Sub_category"])
+
+    logger.info(f"  {len(rev_map)} descriptions revised, "
+                f"{merged['Category'].nunique()} merged categories")
+
+    # 4. Load DIT-HAP DR values
+    dit_hap = pd.read_csv(dit_hap_path, sep="\t")
+    dit_hap = dit_hap[["Systematic ID", "DR"]].dropna(subset=["DR"])
+
+    # 5. Compute median DR per merged Category
+    joined = merged.merge(dit_hap, on="Systematic ID", how="left")
+    cat_dr_median = (
+        joined.groupby("Category")["DR"]
+        .median()
+        .sort_values(ascending=False)
+    )
+    logger.info(f"  DR medians computed for {len(cat_dr_median)} categories")
+
+    # 6. Assign Growth_tier: 1=highest median, 2=second, ...
+    tier_map = {cat: i + 1 for i, cat in enumerate(cat_dr_median.index)}
+    merged["Growth_tier"] = merged["Category"].map(tier_map)
+
+    # Log the ranking
+    for cat, med in cat_dr_median.items():
+        logger.info(f"    Tier {tier_map[cat]:2d}: {cat:50s} med DR = {med:.4f}")
+
+    return merged
+
+
 def build_summaries(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Build summary sheets for the output workbook."""
     summaries: dict[str, pd.DataFrame] = {}
@@ -109,6 +170,12 @@ def build_summaries(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
 
     summaries["Category"] = (
         df.value_counts("Category")
+        .rename("Count")
+        .to_frame()
+    )
+
+    summaries["Sub_category"] = (
+        df.value_counts("Sub_category")
         .rename("Count")
         .to_frame()
     )
@@ -138,10 +205,14 @@ def main() -> int:
     logger.info(f"Loading categorized phenotypes: {input_path}")
     merged = load_and_concat(input_path)
 
-    # 2. Build summaries
+    # 2. Apply revised category merges and re-rank Growth_tier by DR median
+    logger.info("Applying revised category merges and re-ranking Growth_tier…")
+    merged = apply_category_merge(merged, DEFAULT_REVISED, DEFAULT_DIT_HAP)
+
+    # 3. Build summaries
     summaries = build_summaries(merged)
 
-    # 3. Save
+    # 4. Save
     output_path.parent.mkdir(parents=True, exist_ok=True)
     results_path.parent.mkdir(parents=True, exist_ok=True)
 

@@ -160,9 +160,13 @@ def setup_logger(log_level: str = "INFO") -> None:
 
 
 def load_merged(path: Path) -> pd.DataFrame:
-    """Load merged categories, keeping only Systematic ID, description, and Category."""
+    """Load merged categories with Systematic ID, description, Sub_category, and Category."""
     df = pd.read_excel(path, sheet_name="All genes")
-    return df[["Systematic ID", "Deletion mutant phenotype description", "Category"]].copy()
+    cols = ["Systematic ID", "Deletion mutant phenotype description"]
+    if "Sub_category" in df.columns:
+        cols.append("Sub_category")
+    cols.append("Category")
+    return df[cols].copy()
 
 
 def apply_revised(merged: pd.DataFrame, revised_path: Path) -> pd.DataFrame:
@@ -430,19 +434,20 @@ def main() -> int:
     grna = load_grna(args.grna)
     logger.info(f"  {len(grna)} genes with um values")
 
-    # Plot 1: without revised (original categories)
-    logger.info("=== Plot 1: original (no revision) ===")
-    dr_dict = build_value_dict(merged, dit_hap, "DR")
-    um_dict = build_value_dict(merged, grna, "um")
+    # Plot 1: original fine-grained categories (Sub_category)
+    logger.info("=== Plot 1: original (Sub_category) ===")
+    merged_orig = merged.copy()
+    merged_orig["Category"] = merged_orig["Sub_category"]
+    dr_dict = build_value_dict(merged_orig, dit_hap, "DR")
+    um_dict = build_value_dict(merged_orig, grna, "um")
     logger.info(f"  {len(dr_dict)} DR categories, {len(um_dict)} um categories")
     plot_combined(dr_dict, um_dict, args.output_dir / "DR_um_distribution_original.png", revised_path=args.revised)
 
-    # Plot 2: with revised
-    logger.info("=== Plot 2: revised ===")
-    merged_rev = apply_revised(merged, args.revised)
-    logger.info(f"  {merged_rev['Category'].nunique()} categories after revision")
-    dr_dict_rev = build_value_dict(merged_rev, dit_hap, "DR")
-    um_dict_rev = build_value_dict(merged_rev, grna, "um")
+    # Plot 2: merged categories (Category column already has revised merges)
+    logger.info("=== Plot 2: revised (merged Category) ===")
+    logger.info(f"  {merged['Category'].nunique()} merged categories")
+    dr_dict_rev = build_value_dict(merged, dit_hap, "DR")
+    um_dict_rev = build_value_dict(merged, grna, "um")
     logger.info(f"  {len(dr_dict_rev)} DR categories, {len(um_dict_rev)} um categories")
     plot_combined(dr_dict_rev, um_dict_rev, args.output_dir / "DR_um_distribution_revised.png", show_pvalues=True)
 
