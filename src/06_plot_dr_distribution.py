@@ -49,6 +49,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from loguru import logger
+from scipy.stats import mannwhitneyu
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -72,6 +73,7 @@ CATEGORY_COLOR_MAP: dict[str, str] = {
     "germinated, spores": "#7B68A6",
     "some germinated, spores": "#9E7BB5",
     "germinated and divided": "#F781BF",
+    "germinated, divided or microcolonies": "#E7298A",
     "germinated and divided, spores": "#E7298A",
     "germinated, some divided": "#FF7F0E",
     "germinated, often divided": "#FFA040",
@@ -115,6 +117,7 @@ CATEGORY_ORDER: list[str] = [
     "spores, germinated, some microcolonies",
     "spores, germinated, occasionally microcolonies",
     "spores, germinated, microcolonies",
+    "spores, miscellaneous",
     "spores, germinated, small colonies",
     "spores, microcolonies",
     "spores, some microcolonies",
@@ -122,10 +125,11 @@ CATEGORY_ORDER: list[str] = [
     "germinated, some divided",
     "germinated, occasionally divided",
     "germinated, often divided",
-    "germinated and divided",
+    "germinated, divided or microcolonies",
     "germinated, some microcolonies",
     "germinated, occasionally microcolonies",
     "germinated, microcolonies",
+    "germinated, divided or microcolonies",
     "microcolonies",
     "microcolonies, occasionally spores, occasionally germinated",
     "microcolonies, some spores, some germinated",
@@ -254,9 +258,54 @@ def horizontal_violin_box(categories: list[str], data: list[list[float]], ax: pl
     ax.set_xlim(*VALUE_RANGE)
 
 
-def plot_combined(dr_dict: dict[str, list[float]], um_dict: dict[str, list[float]], output_path: Path) -> None:
+def build_grouped_order(
+    dr_dict: dict[str, list[float]],
+    um_dict: dict[str, list[float]],
+    revised_path: Path | None = None,
+) -> tuple[list[str], list[int]]:
+    """Build category order, optionally grouped by revised category.
+
+    Returns (ordered_categories, boundary_positions) where boundary_positions
+    are the y-index positions after which a horizontal divider should be drawn.
+    """
+    present = [c for c in CATEGORY_ORDER if c in dr_dict or c in um_dict]
+    if revised_path is None or not revised_path.exists():
+        return present, []
+
+    # Load revised mapping: original → revised
+    rev = pd.read_excel(revised_path, sheet_name="Flat inspection")
+    rev_map: dict[str, str] = {}
+    for _, r in rev[rev["Revised"].notna()].iterrows():
+        rev_map[r["Category"]] = r["Revised"]
+
+    # Group present categories by their revised category (or self if no revision)
+    groups: dict[str, list[str]] = {}
+    for c in present:
+        key = rev_map.get(c, c)
+        groups.setdefault(key, []).append(c)
+
+    # Order groups by the position of their first member in CATEGORY_ORDER
+    group_keys = sorted(groups.keys(), key=lambda g: min(CATEGORY_ORDER.index(c) for c in groups[g]))
+
+    ordered: list[str] = []
+    boundaries: list[int] = []
+    for g in group_keys:
+        ordered.extend(groups[g])
+        if g != group_keys[-1]:
+            boundaries.append(len(ordered) - 1)  # draw line after this position
+
+    return ordered, boundaries
+
+
+def plot_combined(
+    dr_dict: dict[str, list[float]],
+    um_dict: dict[str, list[float]],
+    output_path: Path,
+    revised_path: Path | None = None,
+    show_pvalues: bool = False,
+) -> None:
     """Plot DR (DIT-HAP) and um (gRNA) side by side with statistics panel."""
-    all_cats = [c for c in CATEGORY_ORDER if c in dr_dict or c in um_dict]
+    all_cats, boundaries = build_grouped_order(dr_dict, um_dict, revised_path)
     colors = [CATEGORY_COLOR_MAP.get(c, "gray") for c in all_cats]
 
     n_cats = len(all_cats)
@@ -294,11 +343,56 @@ def plot_combined(dr_dict: dict[str, list[float]], um_dict: dict[str, list[float
     axes[2].invert_yaxis()
     axes[2].axis("off")
 
+    # Draw horizontal divider lines between revised groups
+    for b in boundaries:
+        y = b + 0.5
+        for ax in axes[:2]:
+            ax.axhline(y=y, color="gray", linewidth=0.8, linestyle="--")
+
+    # P-value annotations between adjacent categories
+    if show_pvalues:
+        _draw_pvalue_annotations(all_cats, dr_dict, axes[0], n_cats)
+        _draw_pvalue_annotations(all_cats, um_dict, axes[1], n_cats)
+
     plt.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path, dpi=300, bbox_inches="tight")
     plt.close(fig)
     logger.success(f"Saved: {output_path}")
+
+
+def _draw_pvalue_annotations(
+    cats: list[str],
+    data_dict: dict[str, list[float]],
+    ax: plt.Axes,
+    n_cats: int,
+) -> None:
+    """Draw Mann-Whitney U p-values between adjacent category pairs."""
+    xlim = ax.get_xlim()
+    x_bracket = xlim[1] + 0.02  # just right of the data area
+    for i in range(len(cats) - 1):
+        vals_a = [v for v in data_dict.get(cats[i], []) if not np.isnan(v)]
+        vals_b = [v for v in data_dict.get(cats[i + 1], []) if not np.isnan(v)]
+        if len(vals_a) < 2 or len(vals_b) < 2:
+            continue
+        _, pval = mannwhitneyu(vals_a, vals_b, alternative="two-sided")
+        bold = pval < 0.05
+        y = i + 0.5
+        # Vertical bracket connecting the two categories
+        ax.plot([x_bracket, x_bracket], [i, i + 1], color="black", linewidth=0.5, clip_on=False)
+        # Small horizontal ticks at each end
+        tick_w = 0.01
+        ax.plot([x_bracket, x_bracket + tick_w], [i, i], color="black", linewidth=0.5, clip_on=False)
+        ax.plot([x_bracket, x_bracket + tick_w], [i + 1, i + 1], color="black", linewidth=0.5, clip_on=False)
+        # P-value text to the right of the bracket
+        pval_str = f"p={pval:.3f}" if pval >= 0.001 else "p<0.001"
+        ax.text(
+            x_bracket + tick_w + 0.01, y, pval_str,
+            va="center", ha="left", fontsize=4.5,
+            fontweight="bold" if bold else "normal",
+            color="red" if bold else "gray",
+            clip_on=False,
+        )
 
 
 # =============================================================================
@@ -340,7 +434,7 @@ def main() -> int:
     dr_dict = build_value_dict(merged, dit_hap, "DR")
     um_dict = build_value_dict(merged, grna, "um")
     logger.info(f"  {len(dr_dict)} DR categories, {len(um_dict)} um categories")
-    plot_combined(dr_dict, um_dict, args.output_dir / "DR_um_distribution_original.png")
+    plot_combined(dr_dict, um_dict, args.output_dir / "DR_um_distribution_original.png", revised_path=args.revised)
 
     # Plot 2: with revised
     logger.info("=== Plot 2: revised ===")
@@ -349,7 +443,7 @@ def main() -> int:
     dr_dict_rev = build_value_dict(merged_rev, dit_hap, "DR")
     um_dict_rev = build_value_dict(merged_rev, grna, "um")
     logger.info(f"  {len(dr_dict_rev)} DR categories, {len(um_dict_rev)} um categories")
-    plot_combined(dr_dict_rev, um_dict_rev, args.output_dir / "DR_um_distribution_revised.png")
+    plot_combined(dr_dict_rev, um_dict_rev, args.output_dir / "DR_um_distribution_revised.png", show_pvalues=True)
 
     return 0
 
