@@ -107,6 +107,16 @@ CASES: list[tuple[str, str, int]] = [
 
     # ── Combined: spores + microcolonies (tier 3) ────────────────────────
     ("ESSENTIAL spores, microcolonies misshapen cells at 25,32",          "spores, microcolonies", 3),
+
+    # ── "occasional" normalised to "occasionally" ───────────────────────
+    ("ESSENTIAL spores, germinated spores, occasional microcolonies of WT/ rounded cells at 25,32",
+     "spores, germinated, occasionally microcolonies", 3),
+    ("ESSENTIAL spores, germinated spores, occasionally microcolonies misshapen cells at 25,32",
+     "spores, germinated, occasionally microcolonies", 3),
+
+    # ── Multi-temperature: "germinated spores and colonies" → unified ───
+    ("ESSENTIAL spores, germinated spores, microcolonies slightly misshapen cells at 32, spores, germinated spores at 25",
+     "spores, germinated, microcolonies", 3),
 ]
 
 
