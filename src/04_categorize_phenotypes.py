@@ -74,6 +74,9 @@ DEFAULT_MANUAL = Path(
 DEFAULT_OUTPUT = Path(
     "data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx"
 )
+DEFAULT_DIT_HAP = Path(
+    "data/references/all_coding_genes_with_DIT_HAP_clustering.tsv"
+)
 
 # Reverse lookup: known category name → growth tier.
 # Derived from the canonical signal table; fallback to tier 5 (WT).
@@ -98,9 +101,29 @@ def setup_logger(log_level: str = "INFO") -> None:
 
 setup_logger()
 
+
 # =============================================================================
 # CORE LOGIC
 # =============================================================================
+
+
+def rerank_growth_tier_by_dr(df: pd.DataFrame, dit_hap_path: Path) -> pd.DataFrame:
+    """Reassign Growth_tier based on DR median per Category, ranked high→low."""
+    if not dit_hap_path.exists():
+        logger.warning(f"DIT-HAP file not found: {dit_hap_path}, keeping signal-based tiers")
+        return df
+    dit_hap = pd.read_csv(dit_hap_path, sep="\t")
+    dit_hap = dit_hap[["Systematic ID", "DR"]].dropna(subset=["DR"])
+    joined = df.merge(dit_hap, on="Systematic ID", how="left")
+    cat_dr_median = (
+        joined.groupby("Category")["DR"]
+        .median()
+        .sort_values(ascending=False)
+    )
+    tier_map = {cat: i + 1 for i, cat in enumerate(cat_dr_median.index)}
+    df["Growth_tier"] = df["Category"].map(tier_map).fillna(len(tier_map) + 1).astype(int)
+    logger.info(f"  Growth_tier re-ranked by DR median ({len(tier_map)} categories)")
+    return df
 
 
 def classify_one_phenotype(df: pd.DataFrame) -> pd.DataFrame:
@@ -271,6 +294,16 @@ def main() -> int:
 
     # Also build a combined "All genes" pivot for the full description
     all_genes = pd.concat([one, multi, inconsistent], ignore_index=True)
+
+    # Re-rank Growth_tier by DR median (unified with 05_merge_categories)
+    logger.info("Re-ranking Growth_tier by DIT-HAP DR median…")
+    all_genes = rerank_growth_tier_by_dr(all_genes, DEFAULT_DIT_HAP)
+    # Apply same re-ranking to individual branches
+    n_one = len(one)
+    n_multi = len(multi)
+    one = all_genes.iloc[:n_one].copy()
+    multi = all_genes.iloc[n_one:n_one + n_multi].copy()
+    inconsistent = all_genes.iloc[n_one + n_multi:].copy()
     pivots["Phenotypes pivot (All genes)"] = build_pivot(
         all_genes, "Deletion mutant phenotype description", "Category"
     )
