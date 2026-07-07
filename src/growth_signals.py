@@ -182,6 +182,12 @@ def _get_modifier_prefix(seg: str) -> str | None:
     return None
 
 
+def _normalise_modifier(mod: str) -> str:
+    """Normalise modifier variants to a canonical form."""
+    variants = {"occasional": "occasionally"}
+    return variants.get(mod, mod)
+
+
 def _signal_to_name(signal: GrowthSignal, modifier: str | None) -> str:
     """Convert a signal + modifier into a category name.
 
@@ -190,6 +196,7 @@ def _signal_to_name(signal: GrowthSignal, modifier: str | None) -> str:
     """
     if modifier is None:
         return signal.category
+    modifier = _normalise_modifier(modifier)
     # "germinated and divided" → "often divided" (germinated already implied)
     if signal.category == "germinated and divided":
         return f"{modifier} divided"
@@ -265,11 +272,19 @@ def classify_growth(description: str) -> tuple[str, int]:
         if base not in primary_bases:
             all_cats.add(mcat)
 
-    # Sort categories: primary (non-modifier) first, then modifier-led.
-    # Within each group, sort by tier ascending (more severe first).
-    cat_sort_key: dict[str, tuple[int, int]] = {}
+    # Sort: (is_modifier, tier, sub_order)
+    # sub_order: within same tier, germinated (0) before germinated and divided (1)
+    SUB_ORDER = {
+        "germinated": 0,
+        "germinated and divided": 1,
+        "spores": 0,
+        "microcolonies": 0,
+        "small colonies": 0,
+        "very small colonies": 0,
+    }
+    cat_sort_key: dict[str, tuple[int, int, int]] = {}
     for s in GROWTH_SIGNALS:
-        cat_sort_key[s.category] = (0, s.tier)  # (is_modifier, tier)
+        cat_sort_key[s.category] = (0, s.tier, SUB_ORDER.get(s.category, 0))
     for cat in all_cats:
         if cat not in cat_sort_key:
             base = cat
@@ -282,7 +297,7 @@ def classify_growth(description: str) -> tuple[str, int]:
             base_tier = next(
                 (s.tier for s in GROWTH_SIGNALS if s.category == base), 5
             )
-            cat_sort_key[cat] = (1, base_tier)  # (is_modifier, tier)
+            cat_sort_key[cat] = (1, base_tier, SUB_ORDER.get(base, 0))
 
     # When all categories are modifier-led (no primary), the most severe
     # (lowest tier) modifier signal is the "primary" — promote it.
@@ -291,10 +306,10 @@ def classify_growth(description: str) -> tuple[str, int]:
         min_tier = min(cat_sort_key[c][1] for c in all_cats)
         for c in all_cats:
             if cat_sort_key[c][1] == min_tier:
-                cat_sort_key[c] = (0, min_tier)  # promote to primary
+                cat_sort_key[c] = (0, min_tier, cat_sort_key[c][2])  # promote to primary
                 break
 
-    unique_categories: list[str] = sorted(all_cats, key=lambda c: cat_sort_key.get(c, (1, 5)))
+    unique_categories: list[str] = sorted(all_cats, key=lambda c: cat_sort_key.get(c, (1, 5, 0)))
 
     # Post-process: remove redundant broader categories
 

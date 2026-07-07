@@ -57,6 +57,7 @@ from loguru import logger
 DEFAULT_MERGED = Path("data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx")
 DEFAULT_DIT_HAP = Path("data/references/all_coding_genes_with_DIT_HAP_clustering.tsv")
 DEFAULT_GRNA = Path("data/references/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv")
+DEFAULT_REVISED = Path("data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx")
 DEFAULT_OUTPUT_DIR = Path("results")
 
 AX_WIDTH = 5
@@ -105,15 +106,13 @@ CATEGORY_COLOR_MAP: dict[str, str] = {
 CATEGORY_ORDER: list[str] = [
     "spores",
     "spores, some germinated",
-    "spores, some divided, some germinated",
+    "spores, some germinated, some divided",
     "spores, germinated",
     "spores, germinated, some divided",
     "spores, germinated, occasionally divided",
     "spores, germinated, often divided",
     "spores, germinated and divided",
-    "spores, germinated and colonies",
     "spores, germinated, some microcolonies",
-    "spores, germinated, occasional microcolonies",
     "spores, germinated, occasionally microcolonies",
     "spores, germinated, microcolonies",
     "spores, germinated, small colonies",
@@ -156,9 +155,25 @@ def setup_logger(log_level: str = "INFO") -> None:
 
 
 def load_merged(path: Path) -> pd.DataFrame:
-    """Load merged categories, keeping only Systematic ID and Category."""
+    """Load merged categories, keeping only Systematic ID, description, and Category."""
     df = pd.read_excel(path, sheet_name="All genes")
-    return df[["Systematic ID", "Category"]].copy()
+    return df[["Systematic ID", "Deletion mutant phenotype description", "Category"]].copy()
+
+
+def apply_revised(merged: pd.DataFrame, revised_path: Path) -> pd.DataFrame:
+    """Override Category with manually revised values from the inspection file."""
+    if not revised_path.exists():
+        logger.warning(f"Revised file not found: {revised_path}")
+        return merged
+    rev = pd.read_excel(revised_path, sheet_name="Flat inspection")
+    rev = rev[rev["Revised"].notna()][["Phenotype description", "Revised"]].copy()
+    rev.columns = ["Deletion mutant phenotype description", "Revised"]
+    merged = merged.merge(rev, on="Deletion mutant phenotype description", how="left")
+    n_changed = merged["Revised"].notna().sum()
+    merged["Category"] = merged["Revised"].fillna(merged["Category"])
+    merged = merged.drop(columns=["Revised"])
+    logger.info(f"  Applied {n_changed} revised categories")
+    return merged
 
 
 def load_dit_hap(path: Path) -> pd.DataFrame:
@@ -177,7 +192,12 @@ def build_value_dict(merged: pd.DataFrame, values: pd.DataFrame, value_col: str)
     """Join merged categories with a value column and group by Category."""
     joined = merged.merge(values, on="Systematic ID", how="inner")
     result: dict[str, list[float]] = {}
-    for cat in CATEGORY_ORDER:
+    # Use CATEGORY_ORDER first, then append any new categories not in the list
+    all_cats = list(CATEGORY_ORDER) + [
+        c for c in sorted(joined["Category"].unique())
+        if c not in CATEGORY_ORDER
+    ]
+    for cat in all_cats:
         vals = joined.loc[joined["Category"] == cat, value_col].tolist()
         if vals:
             result[cat] = vals
@@ -292,6 +312,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--merged", type=Path, default=DEFAULT_MERGED, help=f"Merged categories xlsx (default: {DEFAULT_MERGED})")
     parser.add_argument("--dit-hap", type=Path, default=DEFAULT_DIT_HAP, help=f"DIT-HAP TSV (default: {DEFAULT_DIT_HAP})")
     parser.add_argument("--grna", type=Path, default=DEFAULT_GRNA, help=f"gRNA TSV (default: {DEFAULT_GRNA})")
+    parser.add_argument("--revised", type=Path, default=DEFAULT_REVISED, help=f"Revised categories xlsx (default: {DEFAULT_REVISED})")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR, help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})")
     parser.add_argument("--verbose", action="store_true", help="Enable DEBUG level logging")
     return parser.parse_args()
@@ -314,17 +335,21 @@ def main() -> int:
     grna = load_grna(args.grna)
     logger.info(f"  {len(grna)} genes with um values")
 
-    # Build both distributions
-    logger.info("Building DR distribution (DIT-HAP)…")
+    # Plot 1: without revised (original categories)
+    logger.info("=== Plot 1: original (no revision) ===")
     dr_dict = build_value_dict(merged, dit_hap, "DR")
-    logger.info(f"  {len(dr_dict)} categories with data")
-
-    logger.info("Building um distribution (gRNA)…")
     um_dict = build_value_dict(merged, grna, "um")
-    logger.info(f"  {len(um_dict)} categories with data")
+    logger.info(f"  {len(dr_dict)} DR categories, {len(um_dict)} um categories")
+    plot_combined(dr_dict, um_dict, args.output_dir / "DR_um_distribution_original.png")
 
-    # Combined figure: DR (left) + um (middle) + stats (right)
-    plot_combined(dr_dict, um_dict, args.output_dir / "DR_um_distribution_combined.png")
+    # Plot 2: with revised
+    logger.info("=== Plot 2: revised ===")
+    merged_rev = apply_revised(merged, args.revised)
+    logger.info(f"  {merged_rev['Category'].nunique()} categories after revision")
+    dr_dict_rev = build_value_dict(merged_rev, dit_hap, "DR")
+    um_dict_rev = build_value_dict(merged_rev, grna, "um")
+    logger.info(f"  {len(dr_dict_rev)} DR categories, {len(um_dict_rev)} um categories")
+    plot_combined(dr_dict_rev, um_dict_rev, args.output_dir / "DR_um_distribution_revised.png")
 
     return 0
 
