@@ -74,24 +74,24 @@ CASES: list[tuple[str, str, int]] = [
     ("VIABLE very small colonies rounded cells at 25,32",                 "very small colonies", 4),
 
     # ── Combined: spores + germinated (mixed population, tier 2) ─────────
-    ("ESSENTIAL spores, germinated spores at 25,32",                      "germinated, spores", 2),
+    ("ESSENTIAL spores, germinated spores at 25,32",                      "spores, germinated", 2),
     # "may divide once" — may is mid-segment (not segment start) → definitive divided
     ("ESSENTIAL spores, germinated spores slightly misshapen may divide once at 25,32",
-     "germinated and divided, spores", 2),
+     "spores, germinated and divided", 2),
 
     # ── Combined: spores + some germinated (low-frequency germination) ───
     # "some germinated spores" → some germinated (distinguished from definitive)
-    ("ESSENTIAL spores, some germinated spores at 25,32",                 "some germinated, spores", 2),
+    ("ESSENTIAL spores, some germinated spores at 25,32",                 "spores, some germinated", 2),
 
     # ── Combined: three parallel growth signals (tier 3) ─────────────────
     ("ESSENTIAL spores, germinated spores, microcolonies misshapen cells at 25,32",
-     "germinated, microcolonies, spores", 3),
+     "spores, germinated, microcolonies", 3),
     # "occasionally misshapen branched" — modifier but no growth signal → 3 signals remain
     ("ESSENTIAL spores, germinated spores, microcolonies long cells, occasionally misshapen branched at 25,32",
-     "germinated, microcolonies, spores", 3),
+     "spores, germinated, microcolonies", 3),
     # "microcolonies slightly misshapen" — microcolonies starts segment → primary
     ("ESSENTIAL spores, germinated spores, microcolonies slightly misshapen cells at 25,32",
-     "germinated, microcolonies, spores", 3),
+     "spores, germinated, microcolonies", 3),
 
     # ── Combined: germinated + microcolonies (tier 3) ────────────────────
     ("ESSENTIAL misshapen germinated spores and microcolonies misshapen cells at 32",
@@ -99,14 +99,14 @@ CASES: list[tuple[str, str, int]] = [
 
     # ── Combined: germinated + spores + small colonies (tier 4) ──────────
     ("ESSENTIAL spores, germinated spores, small colonies long cells at 25,32",
-     "germinated, small colonies, spores", 4),
+     "spores, germinated, small colonies", 4),
 
     # ── Combined: microcolonies + small colonies (tier 4) ────────────────
     ("ESSENTIAL microcolonies skittle cells, small colonies WT cells at 25,32",
      "microcolonies, small colonies", 4),
 
     # ── Combined: spores + microcolonies (tier 3) ────────────────────────
-    ("ESSENTIAL spores, microcolonies misshapen cells at 25,32",          "microcolonies, spores", 3),
+    ("ESSENTIAL spores, microcolonies misshapen cells at 25,32",          "spores, microcolonies", 3),
 ]
 
 

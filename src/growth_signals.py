@@ -265,7 +265,31 @@ def classify_growth(description: str) -> tuple[str, int]:
         if base not in primary_bases:
             all_cats.add(mcat)
 
-    unique_categories: list[str] = sorted(all_cats)
+    # Sort categories: primary (non-modifier) first by tier ascending,
+    # then modifier-led categories after their primary counterpart.
+    # e.g. "spores" (tier 1) before "germinated" (tier 2);
+    #      "spores" before "some germinated" (modifier-led, secondary).
+    # Map each category back to its base signal's tier for sorting.
+    # Build a lookup: category_name → sort_key (tier, is_modifier)
+    cat_sort_key: dict[str, tuple[int, int]] = {}
+    for s in GROWTH_SIGNALS:
+        cat_sort_key[s.category] = (s.tier, 0)
+    for cat in all_cats:
+        if cat not in cat_sort_key:
+            # Modifier-prefixed category — find its base
+            base = cat
+            for mod_word in MODIFIER_WORDS:
+                if cat.startswith(mod_word + " "):
+                    base = cat[len(mod_word) + 1:]
+                    break
+            if base == "divided":
+                base = "germinated and divided"
+            base_tier = next(
+                (s.tier for s in GROWTH_SIGNALS if s.category == base), 5
+            )
+            cat_sort_key[cat] = (base_tier, 1)
+
+    unique_categories: list[str] = sorted(all_cats, key=lambda c: cat_sort_key.get(c, (5, 1)))
 
     # Post-process: remove redundant broader categories
 
