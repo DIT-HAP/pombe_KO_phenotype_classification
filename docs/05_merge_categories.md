@@ -5,9 +5,12 @@
 ## Purpose
 
 Concatenates the three phenotype branches (one / multi / inconsistent) from
-the categorized output into a single table for downstream analysis.
-Preserves both the fine-grained `Category` and the coarse `Growth_tier`
-columns.
+the categorized output into a single table, applies manually revised category
+merges, and assigns `Growth_tier` based on DIT-HAP DR median per merged
+category.
+
+The fine-grained classification from step 04 is preserved as `Sub_category`,
+while the revised/merged classification is stored in `Category`.
 
 ---
 
@@ -15,17 +18,37 @@ columns.
 
 ```
 data/4_categorized_genes/                Categorized output from step 04
-  Hayles_2013_OB_categorized_            3 data sheets
-  phenotypes.xlsx
+  Hayles_2013_OB_categorized_
+  phenotypes.xlsx                        (3 data sheets + All genes)
+                             ↓
+data/4_categorized_genes/                Manually revised category mappings
+  Hayles_2013_OB_inspection_             (Revised column in Flat inspection)
+  phenotypes_category_revised_
+  20260707.xlsx
+                             ↓
+data/references/                         DIT-HAP DR values for tier ranking
+  all_coding_genes_with_DIT_HAP_clustering.tsv
                              ↓
                    05_merge_categories.py
                              ↓
 data/5_merged_categories/                Final merged table + summaries
   Hayles_2013_OB_merged_categories.xlsx
-
+                             ↓
 results/                                 Copy for source control
   Hayles_2013_OB_merged_categories.xlsx
 ```
+
+---
+
+## Processing Logic
+
+1. **Load and concat** — merge the three branch sheets into one DataFrame
+2. **Apply category merges** — rename the step-04 `Category` to
+   `Sub_category`, then apply the manually revised mappings from the
+   inspection file's `Revised` column. Descriptions not in the revised file
+   keep their original `Sub_category` as `Category`.
+3. **Re-rank Growth_tier** — compute the median DIT-HAP DR per merged
+   `Category`, rank from highest (tier 1) to lowest (tier N).
 
 ---
 
@@ -35,16 +58,18 @@ results/                                 Copy for source control
 
 **Data sheet:** `All genes` — 4,843 rows.
 
-Key columns (new or modified):
-- `Category` — fine-grained growth category
-- `Growth_tier` — coarse tier (1–5)
+Key columns:
+- `Sub_category` — fine-grained category from step 04 (e.g., `germinated, often divided`)
+- `Category` — merged category after manual revision (e.g., `germinated, divided or microcolonies`)
+- `Growth_tier` — DR-median-ranked tier (1 = highest DR median, N = lowest)
 - `Phenotype_count` — Single / Multiple / Temp_mismatch
 - `Consistency_25_32` — Consistent / Only_32 / Mismatch
 
-**Summary sheets (4):**
-- `Consistency at temperatures` — counts per consistency status
-- `Phenotype count` — counts per Single/Multiple/Temp_mismatch
-- `Category` — counts per category
+**Summary sheets (5):**
+- `Consistency_25_32` — counts per consistency status
+- `Phenotype_count` — counts per Single/Multiple/Temp_mismatch
+- `Category` — counts per merged category
+- `Sub_category` — counts per fine-grained sub-category
 - `Growth_tier` — counts per tier
 
 ### `results/Hayles_2013_OB_merged_categories.xlsx`

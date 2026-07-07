@@ -1,31 +1,37 @@
 """
-Merge Categorized Phenotypes and Assign Essentiality
-=====================================================
+Merge Categorized Phenotypes
+=============================
 
 Concatenates the three phenotype branches (one / multi / inconsistent) from
-the categorized output into a single table, preserving both the fine-grained
-``Category`` and the coarse ``Growth_tier`` columns for downstream analysis.
-
-Replaces the original script that read three separate categorized files.
+the categorized output into a single table, applies manually revised category
+merges (Sub_category → Category), and re-ranks ``Growth_tier`` by DIT-HAP
+DR median per merged category.
 
 Input
 -----
 - ``data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx``
-  (3 data sheets, output of 02_categorize_phenotypes.py)
+  (3 data sheets + All genes, output of 04_categorize_phenotypes.py)
+
+- ``data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx``
+  Manually revised category mappings (Revised column in Flat inspection sheet).
+
+- ``data/references/all_coding_genes_with_DIT_HAP_clustering.tsv``
+  DIT-HAP DR values used for Growth_tier re-ranking.
 
 Output
 ------
 - ``data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx``
-  Single merged table + summary sheets.
+  Single merged table + summary sheets (Category, Sub_category,
+  Consistency_25_32, Phenotype_count, Growth_tier).
 - ``results/Hayles_2013_OB_merged_categories.xlsx`` (copy for source control)
 
 Usage
 -----
-    mamba run -n bioinformatics python src/03_merge_categories.py
+    mamba run -n bioinformatics python src/05_merge_categories.py
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-06-09
-Version:  1.1.0
+Version:  1.2.0
 """
 
 # =============================================================================

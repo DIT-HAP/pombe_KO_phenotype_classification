@@ -2,58 +2,59 @@
 
 ## Overview
 
-Two test files, 72 tests total, all passing:
+Two test files, 75 tests total, all passing:
 
 ```
 mamba run -n bioinformatics python -m pytest tests/ -v
-72 passed in 0.13s
+75 passed in 0.12s
 ```
 
 ---
 
-## `tests/test_growth_signals.py` — End-to-end classification (33 tests)
+## `tests/test_growth_signals.py` — End-to-end classification (36 tests)
 
 Each test case is one line: `(description, expected_category, expected_tier)`.
 All descriptions are taken verbatim from the Hayles 2013 supplementary table.
 
-### WT-like (tier 5) — no growth signal
+**Note:** Tier values in tests are the **signal-based tiers** (1–5) returned
+by `classify_growth()`. The final `Growth_tier` in pipeline output is
+re-ranked by DIT-HAP DR median (see `04_categorize_phenotypes.py`).
+
+### WT-like (signal tier 5) — no growth signal
 
 | Description | Category | Tier | Note |
 |---|---|---|---|
 | `VIABLE WT cells at 25,32` | WT-like | 5 | |
 | `VIABLE misshapen cells at 25,32` | WT-like | 5 | morphology only |
 | `VIABLE slightly long cells at 25,32` | WT-like | 5 | modifier only |
-| `VIABLE WT cells, some germination long at 25,32,` | WT-like | 5 | `some` is modifier → dropped |
+| `VIABLE WT cells, some germination long at 25,32,` | WT-like | 5 | `some` is modifier → `germination` dropped |
 | `VIABLE  WT cells, some germination long at 25,32` | WT-like | 5 | double space variant |
 | `VIABLE slightly misshapen cells, initially branched septated slightly long, abnormal colony morphology at 25,32` | WT-like | 5 | `initially` is modifier → dropped |
 
-### Spores (tier 1)
+### Spores (signal tier 1)
 
 | Description | Category | Tier | Note |
 |---|---|---|---|
 | `ESSENTIAL spores  at 25,32` | spores | 1 | double space |
 | `ESSENTIAL spores at 25,32` | spores | 1 | |
-| `ESSENTIAL spores, some germinated spores at 25,32` | spores | 1 | `some` is modifier → germinated dropped |
 
-### Germinated (tier 2)
+### Germinated (signal tier 2)
 
 | Description | Category | Tier | Note |
 |---|---|---|---|
 | `ESSENTIAL germinated spores long at 25,32` | germinated | 2 | |
 | `ESSENTIAL germinated spores at 25,32` | germinated | 2 | |
-| `ESSENTIAL germinated spores slightly misshapen, some division at 25,32` | germinated | 2 | `some division` dropped |
-| `ESSENTIAL germinated spores long, some division at 25,32` | germinated | 2 | `some division` dropped |
+| `ESSENTIAL germinated spores, often divide once at 25,32` | germinated, often divided | 2 | `often divide` → modifier secondary |
 | `ESSENTIAL germinated spores, occasionally long and then divide at 25,32` | germinated | 2 | `occasionally` dropped |
-| `ESSENTIAL germinated spores, often divide once to give one slightly misshapen cell and one dead cell at 25,32` | germinated | 2 | `often` dropped |
 
-### Germinated and divided (tier 2)
+### Germinated and divided (signal tier 2)
 
 | Description | Category | Tier | Note |
 |---|---|---|---|
 | `ESSENTIAL germinated spores slightly misshapen and divide once at 25,32` | germinated and divided | 2 | `divide` in main segment |
 | `ESSENTIAL germinated spores slightly misshapen, divide once or twice at 25,32` | germinated and divided | 2 | `divide` not modifier → kept |
 
-### Microcolonies (tier 3)
+### Microcolonies (signal tier 3)
 
 | Description | Category | Tier | Note |
 |---|---|---|---|
@@ -61,43 +62,61 @@ All descriptions are taken verbatim from the Hayles 2013 supplementary table.
 | `ESSENTIAL microcolonies skittle cells at 25,32` | microcolonies | 3 | |
 | `ESSENTIAL microcolonies slightly misshapen cells, some long cells at 25,32` | microcolonies | 3 | `some long cells` dropped |
 
-### Small colonies (tier 4)
+### Small colonies (signal tier 4)
 
 | Description | Category | Tier | Note |
 |---|---|---|---|
 | `VIABLE small colonies slightly misshapen cells at 25,32` | small colonies | 4 | |
-| `VIABLE small colonies long cells at 25,32` | small colonies | 4 | |
 | `VIABLE small colonies long cells, possibly diploidising at 25,32` | small colonies | 4 | `possibly` dropped |
 
-### Very small colonies (tier 4)
+### Very small colonies (signal tier 4)
 
 | Description | Category | Tier |
 |---|---|---|
 | `VIABLE very small colonies rounded cells at 25,32` | very small colonies | 4 |
 
-### Combined — spores + germinated (tier 2)
+### Combined — spores + some germinated (signal tier 2)
 
 | Description | Category | Tier | Note |
 |---|---|---|---|
-| `ESSENTIAL spores, germinated spores at 25,32` | germinated, spores | 2 | mixed population |
-| `ESSENTIAL spores, germinated spores slightly misshapen may divide once at 25,32` | germinated and divided, spores | 2 | `may` mid-segment, not modifier-led |
+| `ESSENTIAL spores, some germinated spores at 25,32` | spores, some germinated | 2 | primary `spores` + secondary `some germinated` |
 
-### Combined — three parallel growth signals (tier 3)
+### Combined — spores + germinated (signal tier 2)
 
 | Description | Category | Tier | Note |
 |---|---|---|---|
-| `ESSENTIAL spores, germinated spores, microcolonies misshapen cells at 25,32` | germinated, microcolonies, spores | 3 | |
-| `ESSENTIAL spores, germinated spores, microcolonies long cells, occasionally misshapen branched at 25,32` | germinated, microcolonies, spores | 3 | modifier dropped |
-| `ESSENTIAL spores, germinated spores, microcolonies slightly misshapen cells at 25,32` | germinated, microcolonies, spores | 3 | `microcolonies` starts segment → kept |
+| `ESSENTIAL spores, germinated spores at 25,32` | spores, germinated | 2 | primary spores before germinated (tier order) |
+| `ESSENTIAL spores, germinated spores slightly misshapen may divide once at 25,32` | spores, germinated and divided | 2 | `may` mid-segment → kept |
+
+### Combined — three parallel growth signals (signal tier 3)
+
+| Description | Category | Tier | Note |
+|---|---|---|---|
+| `ESSENTIAL spores, germinated spores, microcolonies misshapen cells at 25,32` | spores, germinated, microcolonies | 3 | |
+| `ESSENTIAL spores, germinated spores, microcolonies long cells, occasionally misshapen branched at 25,32` | spores, germinated, microcolonies | 3 | modifier dropped |
+| `ESSENTIAL spores, germinated spores, microcolonies slightly misshapen cells at 25,32` | spores, germinated, microcolonies | 3 | |
+
+### Combined — "occasional" normalised to "occasionally" (signal tier 3)
+
+| Description | Category | Tier | Note |
+|---|---|---|---|
+| `ESSENTIAL spores, germinated spores, occasional microcolonies of WT/ rounded cells at 25,32` | spores, germinated, occasionally microcolonies | 3 | `occasional` → `occasionally` |
+| `ESSENTIAL spores, germinated spores, occasionally microcolonies misshapen cells at 25,32` | spores, germinated, occasionally microcolonies | 3 | |
+
+### Combined — multi-temperature (signal tier 3)
+
+| Description | Category | Tier | Note |
+|---|---|---|---|
+| `ESSENTIAL spores, germinated spores, microcolonies slightly misshapen cells at 32, spores, germinated spores at 25` | spores, germinated, microcolonies | 3 | |
 
 ### Combined — other
 
 | Description | Category | Tier |
 |---|---|---|
 | `ESSENTIAL misshapen germinated spores and microcolonies misshapen cells at 32` | germinated, microcolonies | 3 |
-| `ESSENTIAL spores, germinated spores, small colonies long cells at 25,32` | germinated, small colonies, spores | 4 |
+| `ESSENTIAL spores, germinated spores, small colonies long cells at 25,32` | spores, germinated, small colonies | 4 |
 | `ESSENTIAL microcolonies skittle cells, small colonies WT cells at 25,32` | microcolonies, small colonies | 4 |
-| `ESSENTIAL spores, microcolonies misshapen cells at 25,32` | microcolonies, spores | 3 |
+| `ESSENTIAL spores, microcolonies misshapen cells at 25,32` | spores, microcolonies | 3 |
 
 ---
 

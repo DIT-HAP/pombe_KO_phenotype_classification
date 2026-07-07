@@ -33,6 +33,7 @@ pombe_KO_phenotype_classification/
 ├── data/
 │   ├── raw/                read-only. the original supplementary table.
 │   │   └── rsob130053supp2.xlsx
+│   ├── references/         external data (DIT-HAP, gRNA, PomBase)
 │   ├── 1_formatted/        formatted phenotype descriptions
 │   ├── 2_keyword_profile/  keyword-level analysis per Growth_tier
 │   ├── 3_grouped_genes/    grouped by phenotype consistency
@@ -40,7 +41,9 @@ pombe_KO_phenotype_classification/
 │   ├── 5_merged_categories/ final merged table + summaries
 │   └── previous_manual_check_of_insistent_phenotypes/
 ├── results/
-│   └── Hayles_2013_OB_merged_categories.xlsx
+│   ├── Hayles_2013_OB_merged_categories.xlsx
+│   ├── DR_um_distribution_original.png
+│   └── DR_um_distribution_revised.png
 └── src/
     ├── 00_download_pombase_annotation.py
     ├── 01_format_and_update_ids.py
@@ -48,6 +51,7 @@ pombe_KO_phenotype_classification/
     ├── 03_group_genes.py
     ├── 04_categorize_phenotypes.py
     ├── 05_merge_categories.py
+    ├── 06_plot_dr_distribution.py     DR/um distribution plots
     ├── growth_signals.py             shared signal-detection engine
     └── script_flow.sh               pipeline entry point
 ```
@@ -61,21 +65,31 @@ Scripts run in this order:
 3. **02_keyword_profile.py** — keyword-level analysis validating word categories
    (growth signals, morphology, modifiers) per Growth_tier
 4. **03_group_genes.py** — groups genes by phenotype consistency at different temperatures
-5. **04_categorize_phenotypes.py** — categorises growth phenotypes using signal-based detection
-6. **05_merge_categories.py** — merges the three classification branches into one output
+5. **04_categorize_phenotypes.py** — categorises growth phenotypes using signal-based detection;
+   re-ranks Growth_tier by DIT-HAP DR median
+6. **05_merge_categories.py** — merges three branches, applies manually revised category
+   merges (Sub_category → Category), re-ranks Growth_tier by DR median
+7. **06_plot_dr_distribution.py** — plots DR (DIT-HAP) and um (gRNA) distributions per category;
+   generates two figures: original (fine-grained Sub_category) and revised (merged Category,
+   with Mann-Whitney U p-value annotations)
 
-Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx`.
+Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx` and
+`results/DR_um_distribution_*.png`.
 
-## What's been done so far
+## Key concepts
 
-- Renamed from `Classify_phenotypes_of_microscopy` to `pombe_KO_phenotype_classification`
-- Created this README
-- Moved raw data from `data/0_raw/` → `data/raw/` (the `0_` prefix was unnecessary)
-- Wrote `.gitignore` covering `data/`, `tmp/`, Python/Jupyter artifacts, macOS system files
-- Renamed all data subdirectories and scripts with numbered prefixes matching pipeline order
-- Implemented signal-based growth phenotype classification engine (`growth_signals.py`)
-- Built keyword profiling analysis (`02_keyword_profile.py`) with 9-category word taxonomy
-- Created test suite (`tests/`) with 78 tests covering signal engine, segment filtering, and Single/Multiple classification
-- Documentation for each pipeline step in `docs/`
-- Decide what to do about the `results/` vs `data/5_merged_categories/` duplication
-- Any further restructuring or refactoring of the classification logic
+- **Sub_category** — fine-grained classification from `classify_growth()` (e.g. `germinated, often divided`)
+- **Category** — merged classification after manual revision (e.g. `germinated, divided or microcolonies`)
+- **Growth_tier** — ranked by DIT-HAP DR median per category (tier 1 = highest median, most severe growth defect)
+- **Signal tier** — biological hierarchy (1=spores, 2=germinated, 3=microcolonies, 4=small colonies, 5=WT-like); used internally by `classify_growth()` but not in final output
+
+## Test suite
+
+75 tests covering signal detection, modifier handling, segment filtering, and
+Single/Multiple classification:
+
+```bash
+mamba run -n bioinformatics python -m pytest tests/ -v
+```
+
+See `docs/tests.md` for detailed test documentation.

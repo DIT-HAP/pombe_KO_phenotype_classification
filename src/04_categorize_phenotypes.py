@@ -2,11 +2,10 @@
 Categorise Growth Phenotypes
 =============================
 
-Reads grouped phenotype data (3 sheets from step 02), assigns each gene a
-fine-grained ``Category`` and a coarse ``Growth_tier`` (1–5) using the
-signal-based ``classify_growth()`` engine.
-
-Replaces the three old ``categorize_genes_with_*_phenotypes.py`` scripts.
+Reads grouped phenotype data (3 sheets from step 03), assigns each gene a
+fine-grained ``Category`` using the signal-based ``classify_growth()``
+engine, then re-ranks ``Growth_tier`` by DIT-HAP DR median (highest median
+= tier 1).
 
 Input
 -----
@@ -17,6 +16,9 @@ Input
 - ``data/previous_manual_check_of_insistent_phenotypes/
    Inconsistent_phenotypes_at_25_32_manual.xlsx``
   Manual annotations for the 131 inconsistent genes.
+
+- ``data/references/all_coding_genes_with_DIT_HAP_clustering.tsv``
+  DIT-HAP DR values used for Growth_tier re-ranking.
 
 Output
 ------
@@ -29,18 +31,19 @@ Output
 
 - ``data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes.xlsx``
   Inspection pivot tables — separate from the main output for easy review:
+    - ``Flat inspection`` — one row per unique description with gene counts
     - Per‑branch Phenotypes, Essentiality, Classification, Growth_tier pivots
     - ``Multi-level pivot (All genes)`` — full description text × 4‑level
       column hierarchy with conditional formatting and binary‑signature sorting
 
 Usage
 -----
-    mamba run -n bioinformatics python src/02_categorize_phenotypes.py
-    mamba run -n bioinformatics python src/02_categorize_phenotypes.py --verbose
+    mamba run -n bioinformatics python src/04_categorize_phenotypes.py
+    mamba run -n bioinformatics python src/04_categorize_phenotypes.py --verbose
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-06-09
-Version:  1.0.0
+Version:  1.2.0
 """
 
 # =============================================================================
@@ -158,8 +161,8 @@ def classify_inconsistent_phenotype(
     """Merge manual annotations and derive Category / Growth_tier.
 
     Uses the pre-annotated ``Category_32`` from the manual file.  If the
-    merge produces an unrecognised category name, falls back to ``WT`` /
-    tier 5.
+    merge produces an unrecognised category name, falls back to ``WT-like``.
+    Growth_tier is later re-ranked by DIT-HAP DR median.
     """
     logger.info(f"Loading manual annotations: {manual_path}")
     manual = pd.read_excel(manual_path)

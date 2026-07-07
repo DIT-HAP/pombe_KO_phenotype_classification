@@ -9,52 +9,76 @@ Defines the canonical `GrowthSignal` dataclass, the signal table, and the
 the original categorize scripts.
 
 This module is not a standalone script — it is imported by
-`02_categorize_phenotypes.py`.
+`04_categorize_phenotypes.py`, `03_group_genes.py`, and `02_keyword_profile.py`.
 
 ---
 
-## Growth Tier Definitions
+## Signal-Based Tier Hierarchy
 
-| Tier | Label | Description | Examples |
+The signal table defines a biological hierarchy of growth defect severity:
+
+| Signal tier | Label | Description | Examples |
 |---|---|---|---|
 | 1 | Spores | Spores visible, fail to germinate | `spores` |
-| 2 | Germinated | Germinated, limited or no division | `germinated spores`, `germinated and then divide` |
+| 2 | Germinated | Germinated, limited or no division | `germinated`, `divide`, `division` |
 | 3 | Microcolonies | Microscopic colonies, severely limited growth | `microcolonies` |
 | 4 | Small colonies | Visible but smaller than WT | `small colonies`, `very small colonies` |
-| 5 | WT | Normal growth | `WT cells` |
+| 5 | WT-like | Normal growth, no defect signals | `WT cells` |
+
+**Note:** The signal tier (1–5) is used internally by `classify_growth()` to
+determine the biological hierarchy. The final `Growth_tier` in the output
+tables is re-ranked by DIT-HAP DR median (see `04_categorize_phenotypes.py`
+and `05_merge_categories.py`).
+
+---
 
 ## Detection Logic
 
-For a phenotype description, `classify_growth()`:
+`classify_growth()` processes a phenotype description as follows:
 
-1. Scans for each keyword in `GROWTH_SIGNALS` (case-insensitive substring
-   match)
-2. Collects all matching signals
-3. Composes category names (sorted alphabetically, deduplicated)
-4. Removes redundant broader categories when a more specific one is present
-   (e.g., `germinated` is implied by `germinated and divided`; `small
-   colonies` is implied by `very small colonies`)
-5. Assigns the **highest** tier among matched signals — this represents the
-   most advanced growth stage the gene can support
-6. Returns `(composed_category_name, growth_tier)`
-7. If no signals are found, returns `("WT", 5)`
+1. Splits the description into comma-separated segments
+2. For each segment, detects all growth signals (case-insensitive substring)
+3. Segments starting with a modifier word (e.g. `some`, `often`,
+   `occasionally`) are treated as secondary — their signals are preserved
+   with a modifier prefix (e.g. `some germinated`, `often divided`)
+4. Primary segments (non-modifier-led) contribute plain signal names
+5. Sorts categories: primary first (by signal tier ascending), then
+   modifier-led. `germinated` sorts before `germinated and divided` within
+   the same tier
+6. When all segments are modifier-led, the most severe (lowest signal tier)
+   is promoted to primary
+7. Removes redundant broader categories (e.g. `germinated` is implied by
+   `germinated and divided`; `small colonies` by `very small colonies`;
+   `spores` by `germinated` when no standalone spores)
+8. If no signals are found, returns `("WT-like", 5)`
+
+### Modifier handling
+
+Modifier words are defined in `MODIFIER_STARTS` and include frequency
+(`some`, `often`, `occasionally`, `possibly`, `may`, etc.), degree
+(`slightly`, `very`, `weak`), and quantity modifiers. The canonical form
+normalises variants (e.g. `occasional` → `occasionally`).
 
 ### Examples
 
-| Description | Category | Tier |
+| Description | Category | Signal tier |
 |---|---|---|
-| `VIABLE WT cells at 25,32` | WT | 5 |
+| `VIABLE WT cells at 25,32` | WT-like | 5 |
+| `ESSENTIAL spores at 25,32` | spores | 1 |
+| `ESSENTIAL germinated spores at 25,32` | germinated | 2 |
+| `ESSENTIAL spores, germinated spores at 25,32` | spores, germinated | 2 |
+| `ESSENTIAL spores, some germinated spores at 25,32` | spores, some germinated | 2 |
+| `ESSENTIAL germinated spores, often divide at 25,32` | germinated, often divided | 2 |
 | `ESSENTIAL microcolonies misshapen at 32` | microcolonies | 3 |
-| `ESSENTIAL germinated spores at 25,32` | germinated, spores | 2 |
-| `ESSENTIAL germinated spores and then divide` | germinated and divided, spores | 2 |
-| `spores` | spores | 1 |
+| `ESSENTIAL germinated spores and then divide` | germinated and divided | 2 |
 | `VIABLE very small colonies at 32` | very small colonies | 4 |
+| `ESSENTIAL microcolonies, occasionally spores, occasionally germinated` | microcolonies, occasionally spores, occasionally germinated | 3 |
 
 ---
 
-## Signal Table (7 entries)
+## Signal Table (6 entries)
 
-| Keyword | Category | Tier | Notes |
+| Keyword | Category | Signal tier | Notes |
 |---|---|---|---|
 | `very small colon` | very small colonies | 4 | Checked before `small colon` |
 | `small colon` | small colonies | 4 | Only if `very small` not present |
@@ -64,8 +88,24 @@ For a phenotype description, `classify_growth()`:
 | `division` | germinated and divided | 2 | — |
 | `spores` | spores | 1 | — |
 
+**Note:** `germination` (noun) is intentionally NOT a signal — in the data it
+only appears in morphological contexts (`germination long`, `poor germination`),
+not as a growth state. The adjective `germinated` covers the growth signal.
+
+---
+
+## Other exported functions
+
+- `filter_primary_segments(description)` — strips modifier-led segments,
+  returns the remaining primary description. Used by test suite.
+- `count_growth_segments(description)` — counts segments containing growth
+  signals (after filtering modifiers). Used by `03_group_genes.py` for
+  Single/Multiple classification.
+- `classify_growth_batch(descriptions)` — batch wrapper around
+  `classify_growth()`.
+
 ---
 
 ## Dependencies
 
-- Python 3.12+ standard library only (`dataclasses`, `re`)
+- Python 3.12+ standard library only (`dataclasses`)

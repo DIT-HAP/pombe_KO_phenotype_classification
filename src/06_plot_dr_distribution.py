@@ -5,21 +5,30 @@ DR / um Distribution by Phenotype Category
 Reads the merged phenotype classification and joins it with two external
 datasets — DIT-HAP (DR/DL) and gRNA (um/lam) — then plots the distribution
 of depletion-rate proxies (DR for DIT-HAP, um for gRNA) across phenotype
-categories using boxplot + violinplot with statistics annotations.
+categories using violin + box plots with statistics annotations.
+
+Generates two figures:
+- **Original** — fine-grained Sub_category (grouped by revised category,
+  with dashed dividers between groups).
+- **Revised** — merged Category with Mann-Whitney U p-value annotations
+  between adjacent categories (p < 0.05 highlighted in bold red).
 
 Input
 -----
 - ``data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx``
-  (sheet ``All genes``) — must contain ``Systematic ID`` and ``Category``.
+  (sheet ``All genes``) — must contain ``Systematic ID``,
+  ``Deletion mutant phenotype description``, ``Sub_category``, and ``Category``.
 - ``data/references/all_coding_genes_with_DIT_HAP_clustering.tsv``
   — must contain ``Systematic ID`` and ``DR``.
 - ``data/references/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv``
   — must contain ``Systematic ID`` and ``um``.
+- ``data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx``
+  — Revised column used for grouping in the original figure.
 
 Output
 ------
-- ``results/DR_distribution_DIT-HAP.png``
-- ``results/um_distribution_gRNA.png``
+- ``results/DR_um_distribution_original.png`` — fine-grained Sub_category
+- ``results/DR_um_distribution_revised.png`` — merged Category with p-values
 
 Usage
 -----
@@ -28,7 +37,7 @@ Usage
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-07-02
-Version:  1.0.0
+Version:  1.1.0
 """
 
 # =============================================================================
