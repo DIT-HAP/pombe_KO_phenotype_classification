@@ -57,6 +57,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+plt.style.use("data/references/DIT_HAP.mplstyle")
 from loguru import logger
 from scipy.stats import mannwhitneyu
 
@@ -268,7 +269,7 @@ def horizontal_violin_box(categories: list[str], data: list[list[float]], ax: pl
             item.set_linewidth(0.8)
 
     ax.set_yticks(positions)
-    ax.set_yticklabels(categories, fontsize=7)
+    ax.set_yticklabels(categories)
     ax.set_xlim(*VALUE_RANGE)
 
 
@@ -325,7 +326,7 @@ def plot_combined(
     n_cats = len(all_cats)
     fig_height = max(AX_HEIGHT, n_cats * 0.35)
     fig, axes = plt.subplots(
-        1, 3, figsize=(2 * AX_WIDTH + 3, fig_height),
+        1, 3, figsize=(3 * AX_WIDTH + 3, fig_height),
         sharey=True, gridspec_kw={"width_ratios": [4, 4, 3]},
     )
 
@@ -352,7 +353,7 @@ def plot_combined(
             if um_vals else
             "gRNA: n=   -, med=  -   "
         )
-        axes[2].text(0.05, row, f"{dr_str}  {um_str}", va="center", ha="left", fontsize=5.5, fontweight="bold", family="monospace")
+        axes[2].text(0.05, row, f"{dr_str}  {um_str}", va="center", ha="left", fontweight="bold", family="monospace")
     axes[2].set_ylim(-0.5, n_cats - 0.5)
     axes[2].invert_yaxis()
     axes[2].axis("off")
@@ -402,7 +403,7 @@ def _draw_pvalue_annotations(
         pval_str = f"p={pval:.3f}" if pval >= 0.001 else "p<0.001"
         ax.text(
             x_bracket + tick_w + 0.01, y, pval_str,
-            va="center", ha="left", fontsize=4.5,
+            va="center", ha="left",
             fontweight="bold" if bold else "normal",
             color="red" if bold else "gray",
             clip_on=False,
