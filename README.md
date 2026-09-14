@@ -44,7 +44,7 @@ pombe_KO_phenotype_classification/
 │   ├── Hayles_2013_OB_merged_categories.xlsx
 │   ├── DR_um_distribution_original.png
 │   └── DR_um_distribution_revised.png
-└── src/
+└── scripts/
     ├── 00_download_pombase_annotation.py
     ├── 01_format_and_update_ids.py
     ├── 02_keyword_profile.py
@@ -53,7 +53,7 @@ pombe_KO_phenotype_classification/
     ├── 05_merge_categories.py
     ├── 06_plot_dr_distribution.py     DR/um distribution plots
     ├── growth_signals.py             shared signal-detection engine
-    └── script_flow.sh               pipeline entry point
+    └── arc/                          deprecated previous implementation
 ```
 
 ## Pipeline
