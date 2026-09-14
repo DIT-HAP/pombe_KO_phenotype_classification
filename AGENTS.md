@@ -44,8 +44,10 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
 
 ## Architecture
 
-- `scripts/growth_signals.py` — shared engine (`classify_growth()`), not a script.
-  Imported by `02`, `03`, `04`.
+- `scripts/growth_signals.py` — shared engine (`classify_growth()`); imported by
+  `03`/`04` (`02` imports only its modifier groups).
+- `scripts/pipeline_utils.py` — shared `setup_logger`, `load_dit_hap`,
+  `category_dr_medians`, and the `DEFAULT_RELEASE` constant.
 - `scripts/category_revisions.py` — shared loader for
   `data/4_categorized_genes/category_revisions.json`, which holds both the plot
   `order` and the `Sub_category → Category` `revisions`. Imported by `05` and `06`.

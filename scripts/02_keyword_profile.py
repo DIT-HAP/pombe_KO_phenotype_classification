@@ -56,11 +56,14 @@ from collections import Counter
 from pathlib import Path
 
 # 2. Data Processing Imports
-import numpy as np
 import pandas as pd
 
 # 3. Third-party Imports
 from loguru import logger
+
+# 4. Local Imports
+from growth_signals import MODIFIER_DEGREE, MODIFIER_FREQ, MODIFIER_QUANT
+from pipeline_utils import setup_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -93,7 +96,6 @@ MORPHOLOGY_WORDS = {
     "vacuolated", "dark", "piled", "up",
     "misplaced", "misplace",
     "colour", "colored", "edged", "edges", "wavy",
-    "septated", "multiseptated",
 }
 MORPH_STEMS = {"long", "short", "branch", "curved", "curv", "stubby", "round",
                "skittle", "swollen", "sept", "misshapen",
@@ -116,7 +118,7 @@ PROCESS_WORDS = {
     "diploids", "diploidising", "diploidises", "diploid",
     "suppressors", "supressors", "suppressor",
     "reverting", "revertants", "revert", "reverts",
-    "stationary", "stationary",
+    "stationary",
     "phase",
     "sporulating", "sporulation",
 }
@@ -125,26 +127,18 @@ PROCESS_STEMS = {"diploid", "suppressor", "supressor",
                  "stationar", "phase",
                  "sporulat"}
 
-# 5. Modifier sub‑categories
-MOD_FREQ_WORDS = {
-    "occasionally", "often", "occasional", "sometimes",
-    "mostly", "rarely", "frequently", "frequency", "rare",
-    "possible", "may", "possibly", "rapidly", "initially",
-}
+# 5. Modifier sub‑categories — imported from growth_signals, as sets for
+# membership/union tests.
+MOD_FREQ_WORDS = set(MODIFIER_FREQ)
+MOD_DEGREE_WORDS = set(MODIFIER_DEGREE)
+MOD_QUANT_WORDS = set(MODIFIER_QUANT)
+
 MOD_FREQ_STEMS = {"occasionally", "occasion", "often", "sometimes",
                   "mostly", "rare", "frequent", "possible", "may",
                   "possibl", "rapid", "initial"}
 
-MOD_DEGREE_WORDS = {
-    "slightly", "very", "highly", "barely", "slight", "high", "weak",
-}
 MOD_DEGREE_STEMS = {"slight", "very", "high", "barely", "weak"}
 
-MOD_QUANT_WORDS = {
-    "some", "many", "few", "lots", "several", "multiple",
-    "once", "twice", "more", "multi", "many",
-    "few", "lots",
-}
 MOD_QUANT_STEMS = {"some", "many", "few", "lots", "several", "multiple",
                    "more", "multi", "many",
                    "once", "twice"}
@@ -192,9 +186,6 @@ IGNORED: set[str] = set(ALL_STEMS) | set(PHRASE_PATTERNS.values())
 
 # ——— Tokenisation ————————————————————————————————————————————————————————————
 
-# Split on whitespace and common punctuation
-_TOKEN_RE = re.compile(r"[,\s;:()]+")
-
 # When reading from the final Excel, the description column name
 DESC_COL = "Deletion mutant phenotype description"
 TIER_COL = "Growth_tier"
@@ -202,16 +193,6 @@ TIER_COL = "Growth_tier"
 # =============================================================================
 # LOGGING SETUP
 # =============================================================================
-
-
-def setup_logger(log_level: str = "INFO") -> None:
-    """Configure the Loguru logger."""
-    logger.remove()
-    logger.add(
-        sys.stdout,
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
-        level=log_level,
-    )
 
 
 setup_logger()

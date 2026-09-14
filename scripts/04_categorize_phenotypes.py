@@ -53,7 +53,6 @@ Version:  1.2.0
 import argparse
 import sys
 from pathlib import Path
-from typing import Any
 
 # 2. Data Processing Imports
 import pandas as pd
@@ -61,8 +60,9 @@ import pandas as pd
 # 3. Third-party Imports
 from loguru import logger
 
-# 3b. Local module
+# 3b. Local modules
 from growth_signals import GROWTH_SIGNALS, classify_growth
+from pipeline_utils import category_dr_medians, load_dit_hap, setup_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -92,16 +92,6 @@ for sig in GROWTH_SIGNALS:
 # =============================================================================
 
 
-def setup_logger(log_level: str = "INFO") -> None:
-    """Configure the Loguru logger."""
-    logger.remove()
-    logger.add(
-        sys.stdout,
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
-        level=log_level,
-    )
-
-
 setup_logger()
 
 
@@ -115,37 +105,19 @@ def rerank_growth_tier_by_dr(df: pd.DataFrame, dit_hap_path: Path) -> pd.DataFra
     if not dit_hap_path.exists():
         logger.warning(f"DIT-HAP file not found: {dit_hap_path}, keeping signal-based tiers")
         return df
-    dit_hap = pd.read_csv(dit_hap_path, sep="\t")
-    dit_hap = dit_hap[["Systematic ID", "DR"]].dropna(subset=["DR"])
-    joined = df.merge(dit_hap, on="Systematic ID", how="left")
-    cat_dr_median = (
-        joined.groupby("Category")["DR"]
-        .median()
-        .sort_values(ascending=False)
-    )
+    cat_dr_median = category_dr_medians(df, load_dit_hap(dit_hap_path))
     tier_map = {cat: i + 1 for i, cat in enumerate(cat_dr_median.index)}
     df["Growth_tier"] = df["Category"].map(tier_map).fillna(len(tier_map) + 1).astype(int)
     logger.info(f"  Growth_tier re-ranked by DR median ({len(tier_map)} categories)")
     return df
 
 
-def classify_one_phenotype(df: pd.DataFrame) -> pd.DataFrame:
-    """Assign Category and Growth_tier for one-phenotype genes.
+def classify_basic_phenotype(df: pd.DataFrame) -> pd.DataFrame:
+    """Assign Category and Growth_tier from the ``Basic phenotype`` column.
 
-    ``classify_growth`` handles modifier‑led segments internally —
-    primary signals get plain names, modifier‑led signals get prefixed
-    names (e.g. ``often divided``).
+    Used for both the one-phenotype and multi-phenotype branches —
+    ``classify_growth`` handles modifier-led segments internally.
     """
-    results = df["Basic phenotype"].apply(classify_growth)
-    df = df.copy()
-    df[["Category", "Growth_tier"]] = pd.DataFrame(
-        results.tolist(), index=df.index
-    )
-    return df
-
-
-def classify_multi_phenotype(df: pd.DataFrame) -> pd.DataFrame:
-    """Assign Category and Growth_tier for multi-phenotype genes."""
     results = df["Basic phenotype"].apply(classify_growth)
     df = df.copy()
     df[["Category", "Growth_tier"]] = pd.DataFrame(
@@ -251,7 +223,7 @@ def main() -> int:
     logger.info(
         f"Processing 'One basic phenotype' ({len(grouped['One basic phenotype'])} genes)…"
     )
-    one = classify_one_phenotype(grouped["One basic phenotype"])
+    one = classify_basic_phenotype(grouped["One basic phenotype"])
 
     # ------------------------------------------------------------------
     # 2. Multi basic phenotypes
@@ -259,7 +231,7 @@ def main() -> int:
     logger.info(
         f"Processing 'Multi basic phenotypes' ({len(grouped['Multi basic phenotypes'])} genes)…"
     )
-    multi = classify_multi_phenotype(grouped["Multi basic phenotypes"])
+    multi = classify_basic_phenotype(grouped["Multi basic phenotypes"])
 
     # ------------------------------------------------------------------
     # 3. Inconsistent phenotypes

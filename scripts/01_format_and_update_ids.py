@@ -84,6 +84,9 @@ import pandas as pd
 # 3. Third-party Imports
 from loguru import logger
 
+# 4. Local Imports
+from pipeline_utils import DEFAULT_RELEASE, setup_logger
+
 # =============================================================================
 # GLOBAL CONSTANTS & ENUMS
 # =============================================================================
@@ -98,9 +101,6 @@ class PomBaseCol(StrEnum):
     SYNONYMS = "synonyms"
 
 
-# PomBase monthly release version — single source of truth for this pipeline
-DEFAULT_RELEASE = "2026-06-01"
-
 # Paths relative to project root
 DEFAULT_RAW_DATA = Path("data/raw/rsob130053supp2.xlsx")
 DEFAULT_ANNOTATION = (
@@ -113,16 +113,6 @@ DEFAULT_CHANGELOG = Path("data/1_formatted/gene_id_mapping_changelog.xlsx")
 # =============================================================================
 # LOGGING SETUP
 # =============================================================================
-
-
-def setup_logger(log_level: str = "INFO") -> None:
-    """Configure the Loguru logger."""
-    logger.remove()
-    logger.add(
-        sys.stdout,
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
-        level=log_level,
-    )
 
 
 setup_logger()

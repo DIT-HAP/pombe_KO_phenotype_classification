@@ -60,15 +60,6 @@ class GrowthSignal:
 # GLOBAL CONSTANTS
 # =============================================================================
 
-# Growth tier labels
-TIER_LABELS: dict[int, str] = {
-    1: "Spores (no germination)",
-    2: "Germinated (limited or no division)",
-    3: "Microcolonies (severely limited growth)",
-    4: "Small colonies (visible but reduced)",
-    5: "WT-like (normal growth)",
-}
-
 # Canonical signal table, ordered from most to least specific.
 # When multiple keywords match, category names are concatenated (alphabetically
 # sorted, deduplicated) and the worst tier is assigned.
@@ -91,18 +82,21 @@ GROWTH_SIGNALS: list[GrowthSignal] = [
 
 # Modifier words — when a comma‑separated segment starts with one of these,
 # it is a secondary description (modifier / morphology supplement) and is
-# excluded from growth‑signal detection.
-MODIFIER_WORDS: tuple[str, ...] = (
-    # Frequency
+# excluded from growth‑signal detection. Kept grouped by type so callers
+# (e.g. 02_keyword_profile) can label them; MODIFIER_WORDS is their union.
+MODIFIER_FREQ: tuple[str, ...] = (
     "occasionally", "often", "occasional", "sometimes",
     "mostly", "rarely", "frequently", "frequency", "rare",
     "possible", "may", "possibly", "rapidly", "initially",
-    # Degree
+)
+MODIFIER_DEGREE: tuple[str, ...] = (
     "slightly", "very", "highly", "barely", "slight", "high", "weak",
-    # Quantity
+)
+MODIFIER_QUANT: tuple[str, ...] = (
     "some", "many", "few", "lots", "several", "multiple",
     "once", "twice", "more", "multi",
 )
+MODIFIER_WORDS: tuple[str, ...] = MODIFIER_FREQ + MODIFIER_DEGREE + MODIFIER_QUANT
 
 # Growth‑signal keywords used for segment‑level analysis.
 GROWTH_KEYWORDS: tuple[str, ...] = (
@@ -341,13 +335,3 @@ def classify_growth(description: str) -> tuple[str, int]:
 
     composed = ", ".join(unique_categories)
     return (composed, growth_tier)
-
-
-def tier_label(tier: int) -> str:
-    """Return a human-readable label for a growth tier number."""
-    return TIER_LABELS.get(tier, f"Unknown tier {tier}")
-
-
-def classify_growth_batch(descriptions: list[str]) -> list[tuple[str, int]]:
-    """Apply ``classify_growth`` to a list of descriptions."""
-    return [classify_growth(d) for d in descriptions]

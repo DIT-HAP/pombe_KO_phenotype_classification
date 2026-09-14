@@ -69,6 +69,7 @@ from loguru import logger
 
 # 4. Project Imports
 from growth_signals import count_growth_segments
+from pipeline_utils import setup_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -84,16 +85,6 @@ TEMP_32 = "32"
 # =============================================================================
 # LOGGING SETUP
 # =============================================================================
-
-
-def setup_logger(log_level: str = "INFO") -> None:
-    """Configure the Loguru logger."""
-    logger.remove()
-    logger.add(
-        sys.stdout,
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
-        level=log_level,
-    )
 
 
 setup_logger()

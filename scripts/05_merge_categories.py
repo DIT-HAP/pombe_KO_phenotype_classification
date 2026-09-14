@@ -39,11 +39,11 @@ Version:  1.2.0
 # IMPORTS
 # =============================================================================
 # 1. Standard Library Imports
+import argparse
 import sys
 from pathlib import Path
 
 # 2. Data Processing Imports
-import numpy as np
 import pandas as pd
 
 # 3. Third-party Imports
@@ -51,6 +51,7 @@ from loguru import logger
 
 # 4. Local Imports
 from category_revisions import DEFAULT_CONFIG, load_category_config
+from pipeline_utils import category_dr_medians, load_dit_hap, setup_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -67,16 +68,6 @@ DEFAULT_RESULTS = Path(
 )
 DEFAULT_DIT_HAP = Path(
     "data/references/all_coding_genes_with_DIT_HAP_clustering.tsv"
-)
-
-# =============================================================================
-# LOGGING SETUP
-# =============================================================================
-
-logger.remove()
-logger.add(
-    sys.stdout,
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
 )
 
 # =============================================================================
@@ -130,20 +121,10 @@ def apply_category_merge(
     logger.info(f"  {len(rev_map)} sub-categories revised, "
                 f"{merged['Category'].nunique()} merged categories")
 
-    # 4. Load DIT-HAP DR values
-    dit_hap = pd.read_csv(dit_hap_path, sep="\t")
-    dit_hap = dit_hap[["Systematic ID", "DR"]].dropna(subset=["DR"])
-
-    # 5. Compute median DR per merged Category
-    joined = merged.merge(dit_hap, on="Systematic ID", how="left")
-    cat_dr_median = (
-        joined.groupby("Category")["DR"]
-        .median()
-        .sort_values(ascending=False)
-    )
+    # 4. Compute median DR per merged Category (1 = highest median)
+    cat_dr_median = category_dr_medians(merged, load_dit_hap(dit_hap_path))
     logger.info(f"  DR medians computed for {len(cat_dr_median)} categories")
 
-    # 6. Assign Growth_tier: 1=highest median, 2=second, ...
     tier_map = {cat: i + 1 for i, cat in enumerate(cat_dr_median.index)}
     merged["Growth_tier"] = merged["Category"].map(tier_map)
 
@@ -197,24 +178,43 @@ def build_summaries(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
 # =============================================================================
 
 
+def parse_args() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Merge categorized phenotypes and re-rank Growth_tier by DR median.",
+    )
+    parser.add_argument("--input", type=Path, default=DEFAULT_INPUT,
+                        help=f"Categorized phenotypes xlsx (default: {DEFAULT_INPUT})")
+    parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT,
+                        help=f"Output xlsx path (default: {DEFAULT_OUTPUT})")
+    parser.add_argument("--results", type=Path, default=DEFAULT_RESULTS,
+                        help=f"Results-copy xlsx path (default: {DEFAULT_RESULTS})")
+    parser.add_argument("--revisions", type=Path, default=DEFAULT_CONFIG,
+                        help=f"Category config JSON (default: {DEFAULT_CONFIG})")
+    parser.add_argument("--dit-hap", type=Path, default=DEFAULT_DIT_HAP,
+                        help=f"DIT-HAP TSV (default: {DEFAULT_DIT_HAP})")
+    parser.add_argument("--verbose", action="store_true",
+                        help="Enable DEBUG level logging")
+    return parser.parse_args()
+
+
 def main() -> int:
     """Main orchestrator."""
-    input_path = DEFAULT_INPUT.resolve()
-    output_path = DEFAULT_OUTPUT.resolve()
-    results_path = DEFAULT_RESULTS.resolve()
+    args = parse_args()
+    setup_logger("DEBUG" if args.verbose else "INFO")
 
-    # 1. Load and merge
+    input_path = args.input.resolve()
+    output_path = args.output.resolve()
+    results_path = args.results.resolve()
+
     logger.info(f"Loading categorized phenotypes: {input_path}")
     merged = load_and_concat(input_path)
 
-    # 2. Apply revised category merges and re-rank Growth_tier by DR median
     logger.info("Applying revised category merges and re-ranking Growth_tier…")
-    merged = apply_category_merge(merged, DEFAULT_CONFIG, DEFAULT_DIT_HAP)
+    merged = apply_category_merge(merged, args.revisions, args.dit_hap)
 
-    # 3. Build summaries
     summaries = build_summaries(merged)
 
-    # 4. Save
     output_path.parent.mkdir(parents=True, exist_ok=True)
     results_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -225,7 +225,7 @@ def main() -> int:
 
     logger.success(f"Merged categories saved: {output_path}")
 
-    # 4. Copy to results/ for source control
+    # Flat copy for source control
     merged.to_excel(results_path, index=False)
     logger.success(f"Results copy saved: {results_path}")
 

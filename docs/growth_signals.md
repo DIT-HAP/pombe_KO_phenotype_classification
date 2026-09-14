@@ -9,7 +9,9 @@ Defines the canonical `GrowthSignal` dataclass, the signal table, and the
 the original categorize scripts.
 
 This module is not a standalone script — it is imported by
-`04_categorize_phenotypes.py`, `03_group_genes.py`, and `02_keyword_profile.py`.
+`03_group_genes.py` and `04_categorize_phenotypes.py`. `02_keyword_profile.py`
+imports its modifier groups (`MODIFIER_FREQ` / `MODIFIER_DEGREE` /
+`MODIFIER_QUANT`).
 
 ---
 
@@ -54,9 +56,8 @@ and `05_merge_categories.py`).
 
 ### Modifier handling
 
-Modifier words are defined in `MODIFIER_STARTS` and include frequency
-(`some`, `often`, `occasionally`, `possibly`, `may`, etc.), degree
-(`slightly`, `very`, `weak`), and quantity modifiers. The canonical form
+Modifier words are grouped as `MODIFIER_FREQ`, `MODIFIER_DEGREE`, and
+`MODIFIER_QUANT`; `MODIFIER_WORDS` is their union. The canonical form
 normalises variants (e.g. `occasional` → `occasionally`).
 
 ### Examples
@@ -76,7 +77,7 @@ normalises variants (e.g. `occasional` → `occasionally`).
 
 ---
 
-## Signal Table (6 entries)
+## Signal Table (7 entries)
 
 | Keyword | Category | Signal tier | Notes |
 |---|---|---|---|
@@ -101,8 +102,6 @@ not as a growth state. The adjective `germinated` covers the growth signal.
 - `count_growth_segments(description)` — counts segments containing growth
   signals (after filtering modifiers). Used by `03_group_genes.py` for
   Single/Multiple classification.
-- `classify_growth_batch(descriptions)` — batch wrapper around
-  `classify_growth()`.
 
 ---
 

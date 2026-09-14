@@ -8,8 +8,9 @@ Tests:
 
 from __future__ import annotations
 
+import importlib
+
 import numpy as np
-import pytest
 from growth_signals import (
     filter_primary_segments,
     count_growth_segments,
@@ -17,30 +18,9 @@ from growth_signals import (
     GROWTH_KEYWORDS,
 )
 
-# Need to import classify_phenotype_count from the step-03 script.
-# It is not importable as a regular module (has argparse at module level),
-# so we import just the function definition.
-import sys, importlib.util
-spec = importlib.util.spec_from_file_location(
-    "group_genes",
-    str(__import__("pathlib").Path(__file__).resolve().parent.parent / "scripts/03_group_genes.py"),
-)
-mod = importlib.util.module_from_spec(spec)
-
-# The file uses __future__ annotations which would cause the import to
-# evaluate all type hints eagerly.  Instead we re-implement the minimal
-# logic inline so tests are decoupled from pipeline I/O code.
-
-# ---------------------------------------------------------------------------
-# A standalone copy of classify_phenotype_count that relies only on
-# count_growth_segments (already imported above).
-# ---------------------------------------------------------------------------
-
-def classify_phenotype_count(phenotype: object) -> str | float:
-    """Replica of 03_group_genes.classify_phenotype_count."""
-    if not isinstance(phenotype, str):
-        return np.nan
-    return "Multiple" if count_growth_segments(phenotype) > 1 else "Single"
+# 03_group_genes.py has a numeric filename, so it cannot be a normal import.
+# conftest.py puts scripts/ on sys.path, so import_module resolves it.
+classify_phenotype_count = importlib.import_module("03_group_genes").classify_phenotype_count
 
 
 # ===========================================================================

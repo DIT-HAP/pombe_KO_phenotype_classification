@@ -53,12 +53,12 @@ from urllib.request import urlopen
 # 2. Third-party Imports
 from loguru import logger
 
+# 3. Local Imports
+from pipeline_utils import DEFAULT_RELEASE, setup_logger
+
 # =============================================================================
 # GLOBAL CONSTANTS
 # =============================================================================
-
-# Default release version (YYYY-MM-DD format, matching PomBase monthly release)
-DEFAULT_RELEASE = "2026-06-01"
 
 # Default output directory (relative to project root)
 DEFAULT_OUTDIR = Path("data/references")
@@ -73,16 +73,6 @@ POMBASE_URL_TEMPLATE = (
 # =============================================================================
 # LOGGING SETUP
 # =============================================================================
-
-
-def setup_logger(log_level: str = "INFO") -> None:
-    """Configure the Loguru logger with stdout output."""
-    logger.remove()
-    logger.add(
-        sys.stdout,
-        format="{time:YYYY-MM-DD HH:mm:ss} | {level:<8} | {message}",
-        level=log_level,
-    )
 
 
 setup_logger()

@@ -64,6 +64,7 @@ from scipy.stats import mannwhitneyu
 
 # 4. Local Imports
 from category_revisions import DEFAULT_CONFIG, load_category_config
+from pipeline_utils import load_dit_hap, setup_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -120,17 +121,6 @@ CATEGORY_COLOR_MAP: dict[str, str] = {
 }
 
 # =============================================================================
-# LOGGING SETUP
-# =============================================================================
-
-
-def setup_logger(log_level: str = "INFO") -> None:
-    """Configure loguru with the given level."""
-    logger.remove()
-    logger.add(sys.stderr, level=log_level, format="<level>{level: <8}</level> | {message}")
-
-
-# =============================================================================
 # CORE LOGIC
 # =============================================================================
 
@@ -143,12 +133,6 @@ def load_merged(path: Path) -> pd.DataFrame:
         cols.append("Sub_category")
     cols.append("Category")
     return df[cols].copy()
-
-
-def load_dit_hap(path: Path) -> pd.DataFrame:
-    """Load DIT-HAP TSV, keeping Systematic ID and DR."""
-    df = pd.read_csv(path, sep="\t")
-    return df[["Systematic ID", "DR"]].dropna(subset=["DR"]).copy()
 
 
 def load_grna(path: Path) -> pd.DataFrame:
