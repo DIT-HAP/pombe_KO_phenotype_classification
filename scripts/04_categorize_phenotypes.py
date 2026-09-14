@@ -38,8 +38,8 @@ Output
 
 Usage
 -----
-    mamba run -n bioinformatics python src/04_categorize_phenotypes.py
-    mamba run -n bioinformatics python src/04_categorize_phenotypes.py --verbose
+    mamba run -n bioinformatics python scripts/04_categorize_phenotypes.py
+    mamba run -n bioinformatics python scripts/04_categorize_phenotypes.py --verbose
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-06-09

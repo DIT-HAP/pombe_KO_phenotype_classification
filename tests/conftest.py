@@ -1,9 +1,9 @@
-"""pytest configuration — add project src/ to sys.path."""
+"""pytest configuration — add project scripts/ to sys.path."""
 
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
+SCRIPTS = ROOT / "scripts"
+if str(SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS))

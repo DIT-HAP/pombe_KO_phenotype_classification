@@ -44,8 +44,8 @@ Output
 
 Usage
 -----
-    mamba run -n bioinformatics python src/02_group_genes.py
-    mamba run -n bioinformatics python src/02_group_genes.py --verbose
+    mamba run -n bioinformatics python scripts/03_group_genes.py
+    mamba run -n bioinformatics python scripts/03_group_genes.py --verbose
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-06-09

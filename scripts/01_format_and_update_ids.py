@@ -56,9 +56,9 @@ Output
 
 Usage
 -----
-    mamba run -n bioinformatics python src/01_format_and_update_ids.py
-    mamba run -n bioinformatics python src/01_format_and_update_ids.py --verbose
-    mamba run -n bioinformatics python src/01_format_and_update_ids.py \\
+    mamba run -n bioinformatics python scripts/01_format_and_update_ids.py
+    mamba run -n bioinformatics python scripts/01_format_and_update_ids.py --verbose
+    mamba run -n bioinformatics python scripts/01_format_and_update_ids.py \\
         --gene-filter "gene_type != 'pseudogene'"
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)

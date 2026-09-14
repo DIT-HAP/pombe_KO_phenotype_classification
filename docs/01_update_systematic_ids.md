@@ -187,16 +187,16 @@ path from the same constant so the two scripts stay in sync.
 
 ```bash
 # Default: format raw data, map IDs using 2026-06-01 annotation, write to data/1_formatted/
-mamba run -n bioinformatics python src/01_format_and_update_ids.py
+mamba run -n bioinformatics python scripts/01_format_and_update_ids.py
 
 # Debug mode
-mamba run -n bioinformatics python src/01_format_and_update_ids.py --verbose
+mamba run -n bioinformatics python scripts/01_format_and_update_ids.py --verbose
 ```
 
 ### Custom paths
 
 ```bash
-mamba run -n bioinformatics python src/01_format_and_update_ids.py \
+mamba run -n bioinformatics python scripts/01_format_and_update_ids.py \
     --raw data/raw/rsob130053supp2.xlsx \
     --annotation data/references/pombase-2026-05-01_gene_IDs_names_products.tsv \
     --output data/1_formatted/Hayles_2013_OB_formatted_phenotypes.xlsx \
@@ -209,7 +209,7 @@ By default, only protein-coding genes are used for the lookup tables. To
 include all feature types:
 
 ```bash
-mamba run -n bioinformatics python src/01_format_and_update_ids.py \
+mamba run -n bioinformatics python scripts/01_format_and_update_ids.py \
     --gene-filter "gene_type != 'pseudogene'"
 ```
 

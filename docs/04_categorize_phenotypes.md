@@ -97,6 +97,6 @@ Classification, Growth_tier pivots, plus a multi-level pivot
 ## Usage
 
 ```bash
-mamba run -n bioinformatics python src/04_categorize_phenotypes.py
-mamba run -n bioinformatics python src/04_categorize_phenotypes.py --verbose
+mamba run -n bioinformatics python scripts/04_categorize_phenotypes.py
+mamba run -n bioinformatics python scripts/04_categorize_phenotypes.py --verbose
 ```

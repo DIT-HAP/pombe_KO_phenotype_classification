@@ -32,8 +32,8 @@ Output
 
 Usage
 -----
-    mamba run -n bioinformatics python src/06_plot_dr_distribution.py
-    mamba run -n bioinformatics python src/06_plot_dr_distribution.py --verbose
+    mamba run -n bioinformatics python scripts/06_plot_dr_distribution.py
+    mamba run -n bioinformatics python scripts/06_plot_dr_distribution.py --verbose
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-07-02

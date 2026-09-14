@@ -37,8 +37,8 @@ Output
 
 Usage
 -----
-    mamba run -n bioinformatics python src/05_keyword_profile.py
-    mamba run -n bioinformatics python src/05_keyword_profile.py --verbose
+    mamba run -n bioinformatics python scripts/02_keyword_profile.py
+    mamba run -n bioinformatics python scripts/02_keyword_profile.py --verbose
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-06-11

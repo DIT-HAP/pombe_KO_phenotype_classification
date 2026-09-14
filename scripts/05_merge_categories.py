@@ -27,7 +27,7 @@ Output
 
 Usage
 -----
-    mamba run -n bioinformatics python src/05_merge_categories.py
+    mamba run -n bioinformatics python scripts/05_merge_categories.py
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-06-09

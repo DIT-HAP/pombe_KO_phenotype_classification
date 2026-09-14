@@ -25,7 +25,7 @@ Output
 
 Usage
 -----
-    from src.growth_signals import classify_growth
+    from scripts.growth_signals import classify_growth
 
     cat, tier = classify_growth("VIABLE WT cells at 25,32")
     # cat == "WT-like", tier == 5

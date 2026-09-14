@@ -81,5 +81,5 @@ Identical copy, saved to the version-controlled `results/` directory.
 ## Usage
 
 ```bash
-mamba run -n bioinformatics python src/05_merge_categories.py
+mamba run -n bioinformatics python scripts/05_merge_categories.py
 ```

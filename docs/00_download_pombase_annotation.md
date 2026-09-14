@@ -84,19 +84,19 @@ After download (or cache hit), `inspect_file()` prints:
 
 ```bash
 # Default: download 2026-06-01 release to data/references/
-mamba run -n bioinformatics python src/00_download_pombase_annotation.py
+mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py
 
 # Specify a different release
-mamba run -n bioinformatics python src/00_download_pombase_annotation.py --release 2026-05-01
+mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py --release 2026-05-01
 
 # Force re-download (overwrite cache)
-mamba run -n bioinformatics python src/00_download_pombase_annotation.py --force
+mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py --force
 
 # Debug mode
-mamba run -n bioinformatics python src/00_download_pombase_annotation.py --verbose
+mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py --verbose
 
 # Custom output directory
-mamba run -n bioinformatics python src/00_download_pombase_annotation.py --outdir data/references
+mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py --outdir data/references
 ```
 
 ---

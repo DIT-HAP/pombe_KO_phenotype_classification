@@ -31,9 +31,9 @@ Output
 
 Usage
 -----
-    mamba run -n bioinformatics python src/00_download_pombase_annotation.py
-    mamba run -n bioinformatics python src/00_download_pombase_annotation.py --release 2026-05-01
-    mamba run -n bioinformatics python src/00_download_pombase_annotation.py --force --verbose
+    mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py
+    mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py --release 2026-05-01
+    mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py --force --verbose
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-06-08

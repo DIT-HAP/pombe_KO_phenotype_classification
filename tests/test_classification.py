@@ -23,7 +23,7 @@ from growth_signals import (
 import sys, importlib.util
 spec = importlib.util.spec_from_file_location(
     "group_genes",
-    str(__import__("pathlib").Path(__file__).resolve().parent.parent / "src/03_group_genes.py"),
+    str(__import__("pathlib").Path(__file__).resolve().parent.parent / "scripts/03_group_genes.py"),
 )
 mod = importlib.util.module_from_spec(spec)
 
