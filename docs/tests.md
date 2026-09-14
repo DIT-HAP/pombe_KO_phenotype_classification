@@ -2,12 +2,16 @@
 
 ## Overview
 
-Two test files, 75 tests total, all passing:
+Three test files, 86 tests total, all passing:
 
 ```
 mamba run -n bioinformatics python -m pytest tests/ -v
-75 passed in 0.12s
+86 passed in 0.20s
 ```
+
+- `tests/test_growth_signals.py` — 36 tests (end-to-end classification)
+- `tests/test_classification.py` — 39 tests (Single/Multiple logic)
+- `tests/test_category_revisions.py` — 11 tests (category config loader)
 
 ---
 
@@ -184,6 +188,27 @@ description has one or multiple parallel growth phenotypes.
 
 ---
 
+## `tests/test_category_revisions.py` — category config loader (11 tests)
+
+Tests `load_category_config()` from `scripts/category_revisions.py`, the shared
+loader for the category JSON (`order` + `Sub_category → Category` `revisions`).
+
+| Test | Expected |
+|---|---|
+| Default path points at JSON | `data/4_categorized_genes/category_revisions.json` |
+| Loads config | 22 revisions; order starts `spores`, ends `septated` |
+| Order includes code-only entries | contains `some microcolonies, small colonies`, `?`, `septated` |
+| Mappings are flat strings | every key and value non-empty `str` |
+| Order is unique strings | all non-empty `str`, no duplicates |
+| Spot checks | e.g. `spores, some germinated` → `spores, germinated` |
+| No chained mappings | `keys ∩ values == ∅` |
+| Missing file | raises `FileNotFoundError` |
+| Non-object JSON | raises `ValueError` |
+| Non-string revision values | raises `ValueError` |
+| Invalid / duplicate order | raises `ValueError` |
+
+---
+
 ## Running the tests
 
 ```bash
@@ -195,6 +220,9 @@ mamba run -n bioinformatics python -m pytest tests/test_growth_signals.py -v
 
 # Single/Multiple logic only
 mamba run -n bioinformatics python -m pytest tests/test_classification.py -v
+
+# Revision mapping loader only
+mamba run -n bioinformatics python -m pytest tests/test_category_revisions.py -v
 
 # Stop on first failure
 mamba run -n bioinformatics python -m pytest tests/ -x

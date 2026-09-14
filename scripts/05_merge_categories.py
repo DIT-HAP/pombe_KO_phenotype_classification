@@ -12,8 +12,9 @@ Input
 - ``data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx``
   (3 data sheets + All genes, output of 04_categorize_phenotypes.py)
 
-- ``data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx``
-  Manually revised category mappings (Revised column in Flat inspection sheet).
+- ``data/4_categorized_genes/category_revisions.json``
+  Hand-curated category config (plot order + ``Sub_category -> Category``
+  merge mapping), shared with step 06.
 
 - ``data/references/all_coding_genes_with_DIT_HAP_clustering.tsv``
   DIT-HAP DR values used for Growth_tier re-ranking.
@@ -48,6 +49,9 @@ import pandas as pd
 # 3. Third-party Imports
 from loguru import logger
 
+# 4. Local Imports
+from category_revisions import DEFAULT_CONFIG, load_category_config
+
 # =============================================================================
 # GLOBAL CONSTANTS
 # =============================================================================
@@ -60,9 +64,6 @@ DEFAULT_OUTPUT = Path(
 )
 DEFAULT_RESULTS = Path(
     "results/Hayles_2013_OB_merged_categories.xlsx"
-)
-DEFAULT_REVISED = Path(
-    "data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx"
 )
 DEFAULT_DIT_HAP = Path(
     "data/references/all_coding_genes_with_DIT_HAP_clustering.tsv"
@@ -106,14 +107,13 @@ def load_and_concat(input_path: Path) -> pd.DataFrame:
 
 def apply_category_merge(
     merged: pd.DataFrame,
-    revised_path: Path,
+    revisions_path: Path,
     dit_hap_path: Path,
 ) -> pd.DataFrame:
     """Rename fine-grained Category to Sub_category and apply revised merges.
 
-    The revised file maps original description → revised Category.
-    Genes whose description is not in the revised file keep their original
-    Category as the merged Category.
+    The revisions file maps ``Sub_category -> Category``. Sub-categories not
+    listed in the mapping keep themselves as their merged Category.
 
     Growth_tier is reassigned based on the DR median of each merged Category,
     ranked from highest median (tier 1) to lowest (tier N).
@@ -121,17 +121,13 @@ def apply_category_merge(
     # 1. Rename old fine-grained Category → Sub_category
     merged = merged.rename(columns={"Category": "Sub_category"})
 
-    # 2. Load revised mapping: description → revised category
-    rev = pd.read_excel(revised_path, sheet_name="Flat inspection")
-    rev_map: dict[str, str] = {}
-    for _, r in rev[rev["Revised"].notna()].iterrows():
-        rev_map[r["Phenotype description"]] = str(r["Revised"])
+    # 2. Load revision mapping: Sub_category → merged Category
+    rev_map = load_category_config(revisions_path).revisions
 
-    # 3. Apply: if description is in rev_map, use revised; else use Sub_category
-    desc_col = "Deletion mutant phenotype description"
-    merged["Category"] = merged[desc_col].map(rev_map).fillna(merged["Sub_category"])
+    # 3. Apply: if sub-category is in rev_map, use revised; else keep it
+    merged["Category"] = merged["Sub_category"].map(rev_map).fillna(merged["Sub_category"])
 
-    logger.info(f"  {len(rev_map)} descriptions revised, "
+    logger.info(f"  {len(rev_map)} sub-categories revised, "
                 f"{merged['Category'].nunique()} merged categories")
 
     # 4. Load DIT-HAP DR values
@@ -213,7 +209,7 @@ def main() -> int:
 
     # 2. Apply revised category merges and re-rank Growth_tier by DR median
     logger.info("Applying revised category merges and re-ranking Growth_tier…")
-    merged = apply_category_merge(merged, DEFAULT_REVISED, DEFAULT_DIT_HAP)
+    merged = apply_category_merge(merged, DEFAULT_CONFIG, DEFAULT_DIT_HAP)
 
     # 3. Build summaries
     summaries = build_summaries(merged)

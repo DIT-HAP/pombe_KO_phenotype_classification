@@ -22,8 +22,9 @@ Input
   — must contain ``Systematic ID`` and ``DR``.
 - ``data/references/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv``
   — must contain ``Systematic ID`` and ``um``.
-- ``data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx``
-  — Revised column used for grouping in the original figure.
+- ``data/4_categorized_genes/category_revisions.json``
+  — shared category config: display ``order`` plus the ``Sub_category -> Category``
+  merge mapping used to group the original figure.
 
 Output
 ------
@@ -61,6 +62,9 @@ plt.style.use("data/references/DIT_HAP.mplstyle")
 from loguru import logger
 from scipy.stats import mannwhitneyu
 
+# 4. Local Imports
+from category_revisions import DEFAULT_CONFIG, load_category_config
+
 # =============================================================================
 # GLOBAL CONSTANTS
 # =============================================================================
@@ -68,7 +72,6 @@ from scipy.stats import mannwhitneyu
 DEFAULT_MERGED = Path("data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx")
 DEFAULT_DIT_HAP = Path("data/references/all_coding_genes_with_DIT_HAP_clustering.tsv")
 DEFAULT_GRNA = Path("data/references/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv")
-DEFAULT_REVISED = Path("data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx")
 DEFAULT_OUTPUT_DIR = Path("results")
 
 AX_WIDTH = 5
@@ -116,43 +119,6 @@ CATEGORY_COLOR_MAP: dict[str, str] = {
     "small colonies, some microcolonies": "#8B4513",
 }
 
-CATEGORY_ORDER: list[str] = [
-    "spores",
-    "spores, some germinated",
-    "spores, some germinated, some divided",
-    "spores, germinated",
-    "spores, germinated, some divided",
-    "spores, germinated, occasionally divided",
-    "spores, germinated, often divided",
-    "spores, germinated, divided or microcolonies",
-    "spores, germinated and divided",
-    "spores, germinated, some microcolonies",
-    "spores, germinated, occasionally microcolonies",
-    "spores, germinated, microcolonies",
-    "spores, miscellaneous",
-    "spores, germinated, small colonies",
-    "spores, microcolonies",
-    "spores, some microcolonies",
-    "germinated",
-    "germinated, some divided",
-    "germinated, occasionally divided",
-    "germinated, often divided",
-    "germinated, divided or microcolonies",
-    "germinated, some microcolonies",
-    "germinated, occasionally microcolonies",
-    "germinated, microcolonies",
-    "microcolonies",
-    "microcolonies, occasionally spores, occasionally germinated",
-    "microcolonies, some spores, some germinated",
-    "microcolonies, small colonies",
-    "some microcolonies, small colonies",
-    "very small colonies",
-    "small colonies",
-    "WT-like",
-    "?",
-    "septated",
-]
-
 # =============================================================================
 # LOGGING SETUP
 # =============================================================================
@@ -179,22 +145,6 @@ def load_merged(path: Path) -> pd.DataFrame:
     return df[cols].copy()
 
 
-def apply_revised(merged: pd.DataFrame, revised_path: Path) -> pd.DataFrame:
-    """Override Category with manually revised values from the inspection file."""
-    if not revised_path.exists():
-        logger.warning(f"Revised file not found: {revised_path}")
-        return merged
-    rev = pd.read_excel(revised_path, sheet_name="Flat inspection")
-    rev = rev[rev["Revised"].notna()][["Phenotype description", "Revised"]].copy()
-    rev.columns = ["Deletion mutant phenotype description", "Revised"]
-    merged = merged.merge(rev, on="Deletion mutant phenotype description", how="left")
-    n_changed = merged["Revised"].notna().sum()
-    merged["Category"] = merged["Revised"].fillna(merged["Category"])
-    merged = merged.drop(columns=["Revised"])
-    logger.info(f"  Applied {n_changed} revised categories")
-    return merged
-
-
 def load_dit_hap(path: Path) -> pd.DataFrame:
     """Load DIT-HAP TSV, keeping Systematic ID and DR."""
     df = pd.read_csv(path, sep="\t")
@@ -207,14 +157,19 @@ def load_grna(path: Path) -> pd.DataFrame:
     return df[["Systematic ID", "um"]].dropna(subset=["um"]).copy()
 
 
-def build_value_dict(merged: pd.DataFrame, values: pd.DataFrame, value_col: str) -> dict[str, list[float]]:
+def build_value_dict(
+    merged: pd.DataFrame,
+    values: pd.DataFrame,
+    value_col: str,
+    order: list[str],
+) -> dict[str, list[float]]:
     """Join merged categories with a value column and group by Category."""
     joined = merged.merge(values, on="Systematic ID", how="inner")
     result: dict[str, list[float]] = {}
-    # Use CATEGORY_ORDER first, then append any new categories not in the list
-    all_cats = list(CATEGORY_ORDER) + [
+    # Use the configured order first, then append new categories not in it
+    all_cats = list(order) + [
         c for c in sorted(joined["Category"].unique())
-        if c not in CATEGORY_ORDER
+        if c not in order
     ]
     for cat in all_cats:
         vals = joined.loc[joined["Category"] == cat, value_col].tolist()
@@ -276,31 +231,29 @@ def horizontal_violin_box(categories: list[str], data: list[list[float]], ax: pl
 def build_grouped_order(
     dr_dict: dict[str, list[float]],
     um_dict: dict[str, list[float]],
-    revised_path: Path | None = None,
+    order: list[str],
+    revisions: dict[str, str] | None = None,
 ) -> tuple[list[str], list[int]]:
     """Build category order, optionally grouped by revised category.
 
-    Returns (ordered_categories, boundary_positions) where boundary_positions
-    are the y-index positions after which a horizontal divider should be drawn.
+    ``revisions`` is the shared ``Sub_category -> Category`` mapping. When
+    provided, sub-categories mapping to the same merged category are placed
+    together. Returns (ordered_categories, boundary_positions) where
+    boundary_positions are the y-index positions after which a horizontal
+    divider should be drawn.
     """
-    present = [c for c in CATEGORY_ORDER if c in dr_dict or c in um_dict]
-    if revised_path is None or not revised_path.exists():
+    present = [c for c in order if c in dr_dict or c in um_dict]
+    if not revisions:
         return present, []
-
-    # Load revised mapping: original → revised
-    rev = pd.read_excel(revised_path, sheet_name="Flat inspection")
-    rev_map: dict[str, str] = {}
-    for _, r in rev[rev["Revised"].notna()].iterrows():
-        rev_map[r["Category"]] = r["Revised"]
 
     # Group present categories by their revised category (or self if no revision)
     groups: dict[str, list[str]] = {}
     for c in present:
-        key = rev_map.get(c, c)
+        key = revisions.get(c, c)
         groups.setdefault(key, []).append(c)
 
-    # Order groups by the position of their first member in CATEGORY_ORDER
-    group_keys = sorted(groups.keys(), key=lambda g: min(CATEGORY_ORDER.index(c) for c in groups[g]))
+    # Order groups by the position of their first member in the display order
+    group_keys = sorted(groups.keys(), key=lambda g: min(order.index(c) for c in groups[g]))
 
     ordered: list[str] = []
     boundaries: list[int] = []
@@ -316,11 +269,12 @@ def plot_combined(
     dr_dict: dict[str, list[float]],
     um_dict: dict[str, list[float]],
     output_path: Path,
-    revised_path: Path | None = None,
+    order: list[str],
+    revisions: dict[str, str] | None = None,
     show_pvalues: bool = False,
 ) -> None:
     """Plot DR (DIT-HAP) and um (gRNA) side by side with statistics panel."""
-    all_cats, boundaries = build_grouped_order(dr_dict, um_dict, revised_path)
+    all_cats, boundaries = build_grouped_order(dr_dict, um_dict, order, revisions)
     colors = [CATEGORY_COLOR_MAP.get(c, "gray") for c in all_cats]
 
     n_cats = len(all_cats)
@@ -421,7 +375,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--merged", type=Path, default=DEFAULT_MERGED, help=f"Merged categories xlsx (default: {DEFAULT_MERGED})")
     parser.add_argument("--dit-hap", type=Path, default=DEFAULT_DIT_HAP, help=f"DIT-HAP TSV (default: {DEFAULT_DIT_HAP})")
     parser.add_argument("--grna", type=Path, default=DEFAULT_GRNA, help=f"gRNA TSV (default: {DEFAULT_GRNA})")
-    parser.add_argument("--revised", type=Path, default=DEFAULT_REVISED, help=f"Revised categories xlsx (default: {DEFAULT_REVISED})")
+    parser.add_argument("--revisions", type=Path, default=DEFAULT_CONFIG, help=f"Category config JSON, order + revisions (default: {DEFAULT_CONFIG})")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR, help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})")
     parser.add_argument("--verbose", action="store_true", help="Enable DEBUG level logging")
     return parser.parse_args()
@@ -444,22 +398,29 @@ def main() -> int:
     grna = load_grna(args.grna)
     logger.info(f"  {len(grna)} genes with um values")
 
+    logger.info("Loading category config…")
+    config = load_category_config(args.revisions)
+    logger.info(f"  {len(config.revisions)} sub-categories revised, "
+                f"{len(config.order)} ordered categories")
+
     # Plot 1: original fine-grained categories (Sub_category)
     logger.info("=== Plot 1: original (Sub_category) ===")
     merged_orig = merged.copy()
     merged_orig["Category"] = merged_orig["Sub_category"]
-    dr_dict = build_value_dict(merged_orig, dit_hap, "DR")
-    um_dict = build_value_dict(merged_orig, grna, "um")
+    dr_dict = build_value_dict(merged_orig, dit_hap, "DR", config.order)
+    um_dict = build_value_dict(merged_orig, grna, "um", config.order)
     logger.info(f"  {len(dr_dict)} DR categories, {len(um_dict)} um categories")
-    plot_combined(dr_dict, um_dict, args.output_dir / "DR_um_distribution_original.png", revised_path=args.revised)
+    plot_combined(dr_dict, um_dict, args.output_dir / "DR_um_distribution_original.png",
+                  order=config.order, revisions=config.revisions)
 
     # Plot 2: merged categories (Category column already has revised merges)
     logger.info("=== Plot 2: revised (merged Category) ===")
     logger.info(f"  {merged['Category'].nunique()} merged categories")
-    dr_dict_rev = build_value_dict(merged, dit_hap, "DR")
-    um_dict_rev = build_value_dict(merged, grna, "um")
+    dr_dict_rev = build_value_dict(merged, dit_hap, "DR", config.order)
+    um_dict_rev = build_value_dict(merged, grna, "um", config.order)
     logger.info(f"  {len(dr_dict_rev)} DR categories, {len(um_dict_rev)} um categories")
-    plot_combined(dr_dict_rev, um_dict_rev, args.output_dir / "DR_um_distribution_revised.png", show_pvalues=True)
+    plot_combined(dr_dict_rev, um_dict_rev, args.output_dir / "DR_um_distribution_revised.png",
+                  order=config.order, show_pvalues=True)
 
     return 0
 

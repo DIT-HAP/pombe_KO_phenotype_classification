@@ -29,7 +29,7 @@ The raw supplementary table is `rsob130053supp2.xlsx`, downloaded from the Open 
 ```
 pombe_KO_phenotype_classification/
 ├── README.md
-├── .gitignore              ignores data/, tmp/, references/, etc.
+├── .gitignore              ignores tmp/, references/, etc. (data/ is tracked)
 ├── data/
 │   ├── raw/                read-only. the original supplementary table.
 │   │   └── rsob130053supp2.xlsx
@@ -37,7 +37,8 @@ pombe_KO_phenotype_classification/
 │   ├── 1_formatted/        formatted phenotype descriptions
 │   ├── 2_keyword_profile/  keyword-level analysis per Growth_tier
 │   ├── 3_grouped_genes/    grouped by phenotype consistency
-│   ├── 4_categorized_genes/ categorized phenotypes + inspection pivots
+│   ├── 4_categorized_genes/ categorized phenotypes, inspection pivots
+│   │                        + category_revisions.json (order + merges)
 │   ├── 5_merged_categories/ final merged table + summaries
 │   └── previous_manual_check_of_insistent_phenotypes/
 ├── results/
@@ -53,6 +54,7 @@ pombe_KO_phenotype_classification/
     ├── 05_merge_categories.py
     ├── 06_plot_dr_distribution.py     DR/um distribution plots
     ├── growth_signals.py             shared signal-detection engine
+    ├── category_revisions.py         shared category order + merge mapping
     └── arc/                          deprecated previous implementation
 ```
 
@@ -67,8 +69,9 @@ Scripts run in this order:
 4. **03_group_genes.py** — groups genes by phenotype consistency at different temperatures
 5. **04_categorize_phenotypes.py** — categorises growth phenotypes using signal-based detection;
    re-ranks Growth_tier by DIT-HAP DR median
-6. **05_merge_categories.py** — merges three branches, applies manually revised category
-   merges (Sub_category → Category), re-ranks Growth_tier by DR median
+6. **05_merge_categories.py** — merges three branches, applies the hand-curated
+   `Sub_category → Category` merges (`data/4_categorized_genes/category_revisions.json`),
+   re-ranks Growth_tier by DR median
 7. **06_plot_dr_distribution.py** — plots DR (DIT-HAP) and um (gRNA) distributions per category;
    generates two figures: original (fine-grained Sub_category) and revised (merged Category,
    with Mann-Whitney U p-value annotations)

@@ -21,10 +21,9 @@ data/4_categorized_genes/                Categorized output from step 04
   Hayles_2013_OB_categorized_
   phenotypes.xlsx                        (3 data sheets + All genes)
                              ↓
-data/4_categorized_genes/                Manually revised category mappings
-  Hayles_2013_OB_inspection_             (Revised column in Flat inspection)
-  phenotypes_category_revised_
-  20260707.xlsx
+data/4_categorized_genes/                Hand-curated category config
+  category_revisions.json                (plot order + Sub_category → Category
+                                         merges; shared with step 06)
                              ↓
 data/references/                         DIT-HAP DR values for tier ranking
   all_coding_genes_with_DIT_HAP_clustering.tsv
@@ -44,9 +43,10 @@ results/                                 Copy for source control
 
 1. **Load and concat** — merge the three branch sheets into one DataFrame
 2. **Apply category merges** — rename the step-04 `Category` to
-   `Sub_category`, then apply the manually revised mappings from the
-   inspection file's `Revised` column. Descriptions not in the revised file
-   keep their original `Sub_category` as `Category`.
+   `Sub_category`, then map it through `category_revisions.json`
+   (`Sub_category → Category`). Sub-categories not listed in the JSON keep
+   themselves as their merged `Category`. The mapping is loaded by the shared
+   `scripts/category_revisions.py` helper.
 3. **Re-rank Growth_tier** — compute the median DIT-HAP DR per merged
    `Category`, rank from highest (tier 1) to lowest (tier N).
 
