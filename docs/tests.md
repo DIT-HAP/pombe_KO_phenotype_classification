@@ -191,21 +191,22 @@ description has one or multiple parallel growth phenotypes.
 ## `tests/test_category_revisions.py` — category config loader (11 tests)
 
 Tests `load_category_config()` from `scripts/category_revisions.py`, the shared
-loader for the category JSON (`order` + `Sub_category → Category` `revisions`).
+loader for the category JSON (one ordered `name -> Category` map).
 
 | Test | Expected |
 |---|---|
 | Default path points at JSON | `data/4_categorized_genes/category_revisions.json` |
-| Loads config | 22 revisions; order starts `spores`, ends `septated` |
-| Order includes code-only entries | contains `some microcolonies, small colonies`, `?`, `septated` |
+| Loads config | 33 order entries, 22 revisions; starts `spores`, ends `WT-like` |
+| Order covers both plot rows | merged-only + previously-missing names present |
+| Identity entries are not revisions | `spores` in order but not in revisions |
 | Mappings are flat strings | every key and value non-empty `str` |
 | Order is unique strings | all non-empty `str`, no duplicates |
 | Spot checks | e.g. `spores, some germinated` → `spores, germinated` |
-| No chained mappings | `keys ∩ values == ∅` |
+| No chained merges | a merge target is not itself merged |
 | Missing file | raises `FileNotFoundError` |
 | Non-object JSON | raises `ValueError` |
-| Non-string revision values | raises `ValueError` |
-| Invalid / duplicate order | raises `ValueError` |
+| Non-string values | raises `ValueError` |
+| Non-idempotent mapping | raises `ValueError` |
 
 ---
 

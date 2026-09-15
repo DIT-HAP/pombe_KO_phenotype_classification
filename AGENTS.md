@@ -49,8 +49,9 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
 - `scripts/pipeline_utils.py` — shared `setup_logger`, `load_dit_hap`,
   `category_dr_medians`, and the `DEFAULT_RELEASE` constant.
 - `scripts/category_revisions.py` — shared loader for
-  `data/4_categorized_genes/category_revisions.json`, which holds both the plot
-  `order` and the `Sub_category → Category` `revisions`. Imported by `05` and `06`.
+  `data/4_categorized_genes/category_revisions.json`, a single ordered
+  `name → Category` map (key order = draw order; `key != value` are the merges).
+  Imported by `05` and `06`.
 - **Two different "tiers"** — don't conflate them:
   - *signal tier* (1–5): fixed biological hierarchy, internal to
     `classify_growth()`.
@@ -58,10 +59,10 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
     in `04`/`05`. Test expectations use signal tiers.
 - `germination` (noun) is intentionally **not** a growth signal — it appears
   only in morphological contexts; the adjective `germinated` is the signal.
-- Plot category order and the `Sub_category → Category` merge both live in
-  `data/4_categorized_genes/category_revisions.json` (`order` and `revisions`
-  keys). Edit that JSON to reorder the figures or change merges; there is no
-  hardcoded order constant anymore.
+- Plot draw order and the `Sub_category → Category` merge both live in
+  `data/4_categorized_genes/category_revisions.json`, a single ordered
+  `name → Category` map. Edit that JSON to reorder the figures or change merges;
+  there is no hardcoded order constant anymore.
 
 ## Data gotchas
 
@@ -75,9 +76,11 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
 - Hand-curated, do **not** regenerate or overwrite:
   - `data/previous_manual_check_of_insistent_phenotypes/Inconsistent_phenotypes_at_25_32_manual.xlsx`
   - `data/4_categorized_genes/category_revisions.json` — single source of truth for
-    the plot `order` and the `Sub_category → Category` merge used by `05`/`06`.
-    Edit this JSON directly. The old `Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx`
-    is frozen; no script reads it anymore.
+    the plot draw order and the `Sub_category → Category` merge used by `05`/`06`.
+    One ordered `name → Category` map (key order = draw order; `key != value` are
+    the merges). Edit this JSON directly. The old
+    `Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx` is
+    frozen; no script reads it anymore.
 - `data/arc/` and `scripts/arc/` are the **deprecated previous implementation**,
   not the live pipeline. `scripts/arc/script_flow.sh` references deleted filenames
   — ignore it.

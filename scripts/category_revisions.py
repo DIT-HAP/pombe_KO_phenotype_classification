@@ -1,22 +1,31 @@
 """
-Category Configuration — Plot Order and Sub_category to Category Revisions
-==========================================================================
+Category Configuration — Sub_category to Category and Plot Order
+================================================================
 
-Single source of truth for the two hand-curated pieces of category metadata:
+Single source of truth for how fine-grained ``Sub_category`` labels (step 04)
+map to the merged ``Category`` labels, and in what order they are drawn on the
+DR/um distribution figures (step 06).
 
-- ``order`` — the display order of ``Sub_category`` labels on the DR/um
-  distribution figures (step 06). Categories absent from the data are ignored;
-  categories present in the data but missing from ``order`` are appended at the
-  end.
-- ``revisions`` — the ``Sub_category -> Category`` merge mapping used by step 05
-  and for grouping in step 06. Only revised ``Sub_category`` values appear as
-  keys; any ``Sub_category`` not listed keeps itself as its ``Category``
-  (equivalent to ``fillna`` on the original sub-category).
+The file is one ordered JSON object. Each key is a name that appears in a
+figure; the value is its final category (identical to the key when unchanged):
 
-Both live in one tracked JSON file (``data/4_categorized_genes/category_revisions.json``).
+    {
+      "spores": "spores",
+      "germinated and divided": "germinated, divided or microcolonies",
+      ...
+    }
 
-Editing the mapping
--------------------
+- **Order** — the key order is the display order. The object must contain
+  every ``Sub_category`` (for the original figure) plus the merged ``Category``
+  names that are not themselves sub-categories (so the revised figure can show
+  them). Names absent from the data are ignored; names present in the data but
+  missing from the file are dropped from the figure.
+- **Merges** — entries where key and value differ are the ``Sub_category ->
+  Category`` revisions used by step 05 and for grouping in step 06. Identity
+  entries (key == value) are only there to record draw order.
+
+Editing
+-------
 Edit ``data/4_categorized_genes/category_revisions.json`` directly. The legacy
 ``Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx`` is
 frozen: no script reads it anymore.
@@ -28,7 +37,7 @@ Input
 Output
 ------
 - ``CategoryConfig`` — ``order`` (``list[str]``) and ``revisions``
-  (``dict[str, str]``).
+  (``dict[str, str]``, non-identity entries only).
 
 Usage
 -----
@@ -39,7 +48,7 @@ Usage
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-09-14
-Version:  2.0.0
+Version:  3.0.0
 """
 
 # =============================================================================
@@ -64,7 +73,7 @@ DEFAULT_CONFIG = Path("data/4_categorized_genes/category_revisions.json")
 
 @dataclass(frozen=True)
 class CategoryConfig:
-    """Hand-curated category metadata: display order and merge revisions."""
+    """Display order plus the non-identity merge mapping."""
 
     order: list[str]
     revisions: dict[str, str]
@@ -76,17 +85,19 @@ class CategoryConfig:
 
 
 def load_category_config(path: Path = DEFAULT_CONFIG) -> CategoryConfig:
-    """Load the category order and revision mapping from JSON.
+    """Load draw order and merge revisions from the category JSON.
 
     Args:
         path: Path to the category configuration JSON file.
 
     Returns:
-        ``CategoryConfig`` with the display ``order`` and ``revisions`` mapping.
+        ``CategoryConfig`` with the display ``order`` (all keys) and the
+        ``revisions`` mapping (key != value only).
 
     Raises:
         FileNotFoundError: If ``path`` does not exist.
-        ValueError: If the JSON structure or value types are invalid.
+        ValueError: If the JSON is not a flat ``str -> str`` object, or if the
+            mapping is not idempotent (a merged category is itself merged).
     """
     if not path.exists():
         raise FileNotFoundError(
@@ -102,20 +113,17 @@ def load_category_config(path: Path = DEFAULT_CONFIG) -> CategoryConfig:
             f"Category config must be a JSON object, got {type(data).__name__}: {path}"
         )
 
-    order = data.get("order")
-    if not isinstance(order, list) or not all(isinstance(c, str) for c in order):
-        raise ValueError(f"Category config 'order' must be a list of strings: {path}")
-    if len(order) != len(set(order)):
-        raise ValueError(f"Category config 'order' contains duplicates: {path}")
-
-    revisions = data.get("revisions")
-    if not isinstance(revisions, dict):
-        raise ValueError(f"Category config 'revisions' must be an object: {path}")
-    for key, value in revisions.items():
+    for key, value in data.items():
         if not isinstance(key, str) or not isinstance(value, str):
             raise ValueError(
-                f"Category revisions must map strings to strings; "
+                f"Category config must map strings to strings; "
                 f"offending entry: {key!r} -> {value!r}"
             )
+        if data.get(value, value) != value:
+            raise ValueError(
+                f"Category config is not idempotent: {key!r} -> {value!r}, "
+                f"but {value!r} is itself merged to {data[value]!r}"
+            )
 
-    return CategoryConfig(order=order, revisions=revisions)
+    revisions = {k: v for k, v in data.items() if k != v}
+    return CategoryConfig(order=list(data), revisions=revisions)
