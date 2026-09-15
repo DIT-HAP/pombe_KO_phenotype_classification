@@ -6,7 +6,8 @@
 
 Reads grouped phenotype data (3 sheets from step 03), assigns each gene a
 fine-grained `Category` using the signal-based `classify_growth()` engine,
-then re-ranks `Growth_tier` by DIT-HAP DR median (highest median = tier 1).
+then re-ranks `Growth_tier` by sign-flipped DIT-HAP DR median (most depleted
+= tier 1; DR is negative, so more negative = more depleted).
 
 `classify_growth()` handles modifier-led comma segments internally —
 segments starting with a modifier word (e.g. `some`, `often`, `occasionally`)
@@ -27,8 +28,9 @@ data/references/                         Manual annotations for the
   Inconsistent_phenotypes_at_25_32_
   manual.xlsx
                              ↓
-data/references/                         DIT-HAP DR values for tier ranking
-  all_coding_genes_with_DIT_HAP_clustering.tsv
+data/references/                         Sign-flipped DIT-HAP DR for tier ranking
+  gene_level_fitting_statistics_
+  minusDR.tsv
                              ↓
                   04_categorize_phenotypes.py
                              ↓
@@ -63,9 +65,10 @@ Merges with the manually curated annotation file (keyed on `Systematic ID`
 
 After all three branches are classified and concatenated into `All genes`,
 `Growth_tier` is re-ranked based on the median DIT-HAP DR value per
-`Category`, from highest (tier 1) to lowest (tier N). This ensures tier
-numbers reflect growth defect severity as measured by depletion rate,
-not just signal hierarchy.
+`Category`, from most depleted (tier 1) to least depleted (tier N). Because
+DR is sign-flipped (negative, more negative = more depleted), tier 1 is the
+category with the lowest median DR. This ensures tier numbers reflect growth
+defect severity as measured by depletion rate, not just signal hierarchy.
 
 ---
 
@@ -81,7 +84,7 @@ not just signal hierarchy.
 
 Each row includes the original columns plus:
 - `Category` — fine-grained growth category (e.g., `spores, germinated`)
-- `Growth_tier` — DR-median-ranked tier (1 = highest DR median, N = lowest)
+- `Growth_tier` — DR-median-ranked tier (1 = most depleted, i.e. most negative DR; N = least)
 
 ### `data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes.xlsx`
 

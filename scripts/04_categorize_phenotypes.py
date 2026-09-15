@@ -4,8 +4,8 @@ Categorise Growth Phenotypes
 
 Reads grouped phenotype data (3 sheets from step 03), assigns each gene a
 fine-grained ``Category`` using the signal-based ``classify_growth()``
-engine, then re-ranks ``Growth_tier`` by DIT-HAP DR median (highest median
-= tier 1).
+engine, then re-ranks ``Growth_tier`` by DIT-HAP DR median (most depleted
+= tier 1; DR is sign-flipped, so more negative = more depleted).
 
 Input
 -----
@@ -17,8 +17,9 @@ Input
    Inconsistent_phenotypes_at_25_32_manual.xlsx``
   Manual annotations for the 131 inconsistent genes.
 
-- ``data/references/all_coding_genes_with_DIT_HAP_clustering.tsv``
-  DIT-HAP DR values used for Growth_tier re-ranking.
+- ``data/references/gene_level_fitting_statistics_minusDR.tsv``
+  Sign-flipped DIT-HAP DR values used for Growth_tier re-ranking
+  (negative = more depleted).
 
 Output
 ------
@@ -78,7 +79,7 @@ DEFAULT_OUTPUT = Path(
     "data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx"
 )
 DEFAULT_DIT_HAP = Path(
-    "data/references/all_coding_genes_with_DIT_HAP_clustering.tsv"
+    "data/references/gene_level_fitting_statistics_minusDR.tsv"
 )
 
 # Reverse lookup: known category name → growth tier.
@@ -101,7 +102,11 @@ setup_logger()
 
 
 def rerank_growth_tier_by_dr(df: pd.DataFrame, dit_hap_path: Path) -> pd.DataFrame:
-    """Reassign Growth_tier based on DR median per Category, ranked high→low."""
+    """Reassign Growth_tier based on DR median per Category, most depleted first.
+
+    DR is sign-flipped (more negative = more depleted), so the lowest median
+    becomes tier 1.
+    """
     if not dit_hap_path.exists():
         logger.warning(f"DIT-HAP file not found: {dit_hap_path}, keeping signal-based tiers")
         return df

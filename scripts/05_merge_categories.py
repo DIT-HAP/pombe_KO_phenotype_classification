@@ -5,7 +5,7 @@ Merge Categorized Phenotypes
 Concatenates the three phenotype branches (one / multi / inconsistent) from
 the categorized output into a single table, applies manually revised category
 merges (Sub_category → Category), and re-ranks ``Growth_tier`` by DIT-HAP
-DR median per merged category.
+DR median per merged category (DR is sign-flipped: most depleted = tier 1).
 
 Input
 -----
@@ -16,8 +16,9 @@ Input
   Hand-curated category config (plot order + ``Sub_category -> Category``
   merge mapping), shared with step 06.
 
-- ``data/references/all_coding_genes_with_DIT_HAP_clustering.tsv``
-  DIT-HAP DR values used for Growth_tier re-ranking.
+- ``data/references/gene_level_fitting_statistics_minusDR.tsv``
+  Sign-flipped DIT-HAP DR values used for Growth_tier re-ranking
+  (negative = more depleted).
 
 Output
 ------
@@ -67,7 +68,7 @@ DEFAULT_RESULTS = Path(
     "results/Hayles_2013_OB_merged_categories.xlsx"
 )
 DEFAULT_DIT_HAP = Path(
-    "data/references/all_coding_genes_with_DIT_HAP_clustering.tsv"
+    "data/references/gene_level_fitting_statistics_minusDR.tsv"
 )
 
 # =============================================================================
@@ -107,7 +108,8 @@ def apply_category_merge(
     listed in the mapping keep themselves as their merged Category.
 
     Growth_tier is reassigned based on the DR median of each merged Category,
-    ranked from highest median (tier 1) to lowest (tier N).
+    ranked from the most depleted (lowest, i.e. most negative DR) as tier 1
+    to the least depleted as tier N.
     """
     # 1. Rename old fine-grained Category → Sub_category
     merged = merged.rename(columns={"Category": "Sub_category"})
@@ -121,7 +123,7 @@ def apply_category_merge(
     logger.info(f"  {len(rev_map)} sub-categories revised, "
                 f"{merged['Category'].nunique()} merged categories")
 
-    # 4. Compute median DR per merged Category (1 = highest median)
+    # 4. Compute median DR per merged Category (1 = most depleted)
     cat_dr_median = category_dr_medians(merged, load_dit_hap(dit_hap_path))
     logger.info(f"  DR medians computed for {len(cat_dr_median)} categories")
 

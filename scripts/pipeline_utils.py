@@ -3,7 +3,12 @@ Shared Pipeline Utilities
 =========================
 
 Small helpers used by more than one pipeline step: logging setup, the
-PomBase release constant, and DIT-HAP loading / DR-median ranking.
+PomBase release constant, and reference-table loading (DIT-HAP / gRNA) with
+DR-median ranking.
+
+DIT-HAP ``DR`` is sign-flipped: it is negative, and a more negative value
+means more severe depletion. ``category_dr_medians`` therefore sorts
+ascending so that tier 1 is the most depleted (most negative) category.
 
 Keeping these here removes the copy-pasted ``setup_logger`` blocks and the
 duplicated DR-ranking logic in ``04_categorize_phenotypes.py`` and
@@ -58,12 +63,16 @@ def setup_logger(log_level: str = "INFO") -> None:
 
 
 # =============================================================================
-# DIT-HAP
+# REFERENCE TABLES (DIT-HAP / gRNA)
 # =============================================================================
 
 
 def load_dit_hap(path: Path) -> pd.DataFrame:
-    """Load DIT-HAP values, keeping systematic IDs with a non-null DR."""
+    """Load DIT-HAP values, keeping systematic IDs with a non-null DR.
+
+    ``DR`` is sign-flipped (negative = depleted); the source file already
+    stores the flipped values, so no negation happens here.
+    """
     df = pd.read_csv(path, sep="\t")
     return df[["Systematic ID", "DR"]].dropna(subset=["DR"]).copy()
 
@@ -73,6 +82,22 @@ def category_dr_medians(
     dit_hap: pd.DataFrame,
     category_col: str = "Category",
 ) -> pd.Series:
-    """Median DIT-HAP DR per category, sorted highest first (tier 1 = highest)."""
+    """Median DIT-HAP DR per category, sorted lowest first (tier 1 = lowest).
+
+    Because DR is sign-flipped (more negative = more depleted), sorting
+    ascending puts the most depleted category first, i.e. tier 1.
+    """
     joined = df.merge(dit_hap, on="Systematic ID", how="left")
-    return joined.groupby(category_col)["DR"].median().sort_values(ascending=False)
+    return joined.groupby(category_col)["DR"].median().sort_values(ascending=True)
+
+
+def load_grna(path: Path) -> pd.DataFrame:
+    """Load gRNA values, keeping systematic IDs with a non-null um.
+
+    The source ``um`` is a positive depletion rate; it is negated on load so
+    that, like the DIT-HAP DR, more negative means more depleted.
+    """
+    df = pd.read_csv(path, sep="\t")
+    df = df[["Systematic ID", "um"]].dropna(subset=["um"]).copy()
+    df["um"] = -df["um"]
+    return df

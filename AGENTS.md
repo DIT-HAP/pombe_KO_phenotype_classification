@@ -73,7 +73,7 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
   reference TSVs are required inputs but are *not* in the repo. Missing files
   must be obtained separately:
   - `pombase-2026-06-01_gene_IDs_names_products.tsv` (produced by `00`)
-  - `all_coding_genes_with_DIT_HAP_clustering.tsv` (`04`/`05`/`06`)
+  - `gene_level_fitting_statistics_minusDR.tsv` (sign-flipped DR; `04`/`05`/`06`)
   - `260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv` (`06`)
   - `DIT_HAP.mplstyle` (`06`)
   The one exception is the hand-curated

@@ -6,8 +6,8 @@
 
 Concatenates the three phenotype branches (one / multi / inconsistent) from
 the categorized output into a single table, applies manually revised category
-merges, and assigns `Growth_tier` based on DIT-HAP DR median per merged
-category.
+merges, and assigns `Growth_tier` based on sign-flipped DIT-HAP DR median per
+merged category (most depleted = tier 1).
 
 The fine-grained classification from step 04 is preserved as `Sub_category`,
 while the revised/merged classification is stored in `Category`.
@@ -25,8 +25,9 @@ data/4_categorized_genes/                Hand-curated category config
   category_revisions.json                (sub-category order, merges,
                                          category order; shared with step 06)
                              ↓
-data/references/                         DIT-HAP DR values for tier ranking
-  all_coding_genes_with_DIT_HAP_clustering.tsv
+data/references/                         Sign-flipped DIT-HAP DR for tier ranking
+  gene_level_fitting_statistics_
+  minusDR.tsv
                              ↓
                    05_merge_categories.py
                              ↓
@@ -48,7 +49,9 @@ results/                                 Copy for source control
    themselves as their merged `Category`. The mapping is loaded by the shared
    `scripts/category_revisions.py` helper.
 3. **Re-rank Growth_tier** — compute the median DIT-HAP DR per merged
-   `Category`, rank from highest (tier 1) to lowest (tier N).
+   `Category`, rank from most depleted (tier 1) to least depleted (tier N).
+   DR is sign-flipped (more negative = more depleted), so tier 1 has the
+   lowest median DR.
 
 ---
 
@@ -61,7 +64,7 @@ results/                                 Copy for source control
 Key columns:
 - `Sub_category` — fine-grained category from step 04 (e.g., `germinated, often divided`)
 - `Category` — merged category after manual revision (e.g., `germinated, divided or microcolonies`)
-- `Growth_tier` — DR-median-ranked tier (1 = highest DR median, N = lowest)
+- `Growth_tier` — DR-median-ranked tier (1 = most depleted = lowest/most negative DR median, N = least)
 - `Phenotype_count` — Single / Multiple / Temp_mismatch
 - `Consistency_25_32` — Consistent / Only_32 / Mismatch
 

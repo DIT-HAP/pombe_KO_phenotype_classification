@@ -7,6 +7,11 @@ datasets — DIT-HAP (DR/DL) and gRNA (um/lam) — then plots the distribution
 of depletion-rate proxies (DR for DIT-HAP, um for gRNA) across phenotype
 categories using violin + box plots with statistics annotations.
 
+Both proxies are sign-flipped so that **more negative = more depleted**.
+The DIT-HAP file already stores flipped ``DR`` values; gRNA ``um`` is
+negated here on load for consistency. The x-axis range covers both flipped
+datasets.
+
 Generates two figures:
 - **Original** — fine-grained Sub_category (grouped by revised category,
   with dashed dividers between groups).
@@ -19,10 +24,11 @@ Input
 - ``data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx``
   (sheet ``All genes``) — must contain ``Systematic ID``,
   ``Deletion mutant phenotype description``, ``Sub_category``, and ``Category``.
-- ``data/references/all_coding_genes_with_DIT_HAP_clustering.tsv``
-  — must contain ``Systematic ID`` and ``DR``.
+- ``data/references/gene_level_fitting_statistics_minusDR.tsv``
+  — must contain ``Systematic ID`` and sign-flipped ``DR``
+  (negative = depleted).
 - ``data/references/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv``
-  — must contain ``Systematic ID`` and ``um``.
+  — must contain ``Systematic ID`` and ``um`` (negated on load).
 - ``data/4_categorized_genes/category_revisions.json``
   — shared category config: display ``order`` plus the ``Sub_category -> Category``
   merge mapping used to group the original figure.
@@ -65,21 +71,23 @@ from scipy.stats import mannwhitneyu
 
 # 4. Local Imports
 from category_revisions import DEFAULT_CONFIG, load_category_config
-from pipeline_utils import load_dit_hap, setup_logger
+from pipeline_utils import load_dit_hap, load_grna, setup_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS
 # =============================================================================
 
 DEFAULT_MERGED = Path("data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx")
-DEFAULT_DIT_HAP = Path("data/references/all_coding_genes_with_DIT_HAP_clustering.tsv")
+DEFAULT_DIT_HAP = Path("data/references/gene_level_fitting_statistics_minusDR.tsv")
 DEFAULT_GRNA = Path("data/references/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv")
 DEFAULT_OUTPUT_DIR = Path("results")
 
 AX_WIDTH = 5
 AX_HEIGHT = 8
 
-VALUE_RANGE = (-0.3, 2.0)
+# Covers both sign-flipped proxies: DIT-HAP DR ≈ [-2.09, 0.17],
+# gRNA um (negated) ≈ [-1.81, 0.17].
+VALUE_RANGE = (-2.2, 0.3)
 
 CATEGORY_COLOR_MAP: dict[str, str] = {
     "WT-like": "#4DAF4A",
@@ -134,12 +142,6 @@ def load_merged(path: Path) -> pd.DataFrame:
         cols.append("Sub_category")
     cols.append("Category")
     return df[cols].copy()
-
-
-def load_grna(path: Path) -> pd.DataFrame:
-    """Load gRNA TSV, keeping Systematic ID and um."""
-    df = pd.read_csv(path, sep="\t")
-    return df[["Systematic ID", "um"]].dropna(subset=["um"]).copy()
 
 
 def build_value_dict(
@@ -261,7 +263,7 @@ def plot_combined(
     revisions: dict[str, str] | None = None,
     show_pvalues: bool = False,
 ) -> None:
-    """Plot DR (DIT-HAP) and um (gRNA) side by side with statistics panel."""
+    """Plot sign-flipped DR (DIT-HAP) and um (gRNA) side by side with statistics panel."""
     all_cats, boundaries = build_grouped_order(dr_dict, um_dict, order, revisions)
     colors = [CATEGORY_COLOR_MAP.get(c, "gray") for c in all_cats]
 
@@ -274,12 +276,12 @@ def plot_combined(
 
     dr_data = [dr_dict.get(c, [np.nan]) for c in all_cats]
     horizontal_violin_box(all_cats, dr_data, axes[0], colors)
-    axes[0].set_title("DR (DIT-HAP)")
+    axes[0].set_title("Depletion\n(DIT-HAP)")
     axes[0].set_xlabel("DR")
 
     um_data = [um_dict.get(c, [np.nan]) for c in all_cats]
     horizontal_violin_box(all_cats, um_data, axes[1], colors)
-    axes[1].set_title("um (gRNA)")
+    axes[1].set_title("Depletion\n(gRNA)")
     axes[1].set_xlabel("um")
 
     for row, cat in enumerate(all_cats):
@@ -291,9 +293,9 @@ def plot_combined(
             "DR:  n=   -, med=  -   "
         )
         um_str = (
-            f"gRNA: n={len(um_vals):<4}, med={np.median(um_vals):<6.3f}"
+            f"um:  n={len(um_vals):<4}, med={np.median(um_vals):<6.3f}"
             if um_vals else
-            "gRNA: n=   -, med=  -   "
+            "um:  n=   -, med=  -   "
         )
         axes[2].text(0.05, row, f"{dr_str}  {um_str}", va="center", ha="left", fontweight="bold", family="monospace")
     axes[2].set_ylim(-0.5, n_cats - 0.5)

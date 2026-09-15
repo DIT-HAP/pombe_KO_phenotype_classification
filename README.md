@@ -70,11 +70,12 @@ Scripts run in this order:
    (growth signals, morphology, modifiers) per Growth_tier
 4. **03_group_genes.py** — groups genes by phenotype consistency at different temperatures
 5. **04_categorize_phenotypes.py** — categorises growth phenotypes using signal-based detection;
-   re-ranks Growth_tier by DIT-HAP DR median
+   re-ranks Growth_tier by sign-flipped DIT-HAP DR median (most depleted = tier 1)
 6. **05_merge_categories.py** — merges three branches, applies the hand-curated
    `Sub_category → Category` merges (`data/4_categorized_genes/category_revisions.json`),
    re-ranks Growth_tier by DR median
-7. **06_plot_dr_distribution.py** — plots DR (DIT-HAP) and um (gRNA) distributions per category;
+7. **06_plot_dr_distribution.py** — plots sign-flipped depletion (DR for DIT-HAP, um for gRNA;
+   more negative = more depleted) per category;
    generates two figures (each as PNG + PDF): original (fine-grained Sub_category) and revised (merged Category,
    with Mann-Whitney U p-value annotations)
 
@@ -85,7 +86,7 @@ Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx` and
 
 - **Sub_category** — fine-grained classification from `classify_growth()` (e.g. `germinated, often divided`)
 - **Category** — merged classification after manual revision (e.g. `germinated, divided or microcolonies`)
-- **Growth_tier** — ranked by DIT-HAP DR median per category (tier 1 = highest median, most severe growth defect)
+- **Growth_tier** — ranked by sign-flipped DIT-HAP DR median per category (tier 1 = most depleted = most negative DR, most severe growth defect)
 - **Signal tier** — biological hierarchy (1=spores, 2=germinated, 3=microcolonies, 4=small colonies, 5=WT-like); used internally by `classify_growth()` but not in final output
 
 ## Test suite
