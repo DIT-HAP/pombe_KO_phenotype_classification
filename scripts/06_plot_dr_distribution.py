@@ -11,7 +11,8 @@ Generates two figures:
 - **Original** — fine-grained Sub_category (grouped by revised category,
   with dashed dividers between groups).
 - **Revised** — merged Category with Mann-Whitney U p-value annotations
-  between adjacent categories (p < 0.05 highlighted in bold red).
+  between adjacent categories, shown in scientific notation (p < 0.05
+  highlighted in bold red).
 
 Input
 -----
@@ -220,13 +221,15 @@ def build_grouped_order(
 ) -> tuple[list[str], list[int]]:
     """Build category order, optionally grouped by revised category.
 
-    ``revisions`` is the shared ``Sub_category -> Category`` mapping. When
-    provided, sub-categories mapping to the same merged category are placed
-    together. Returns (ordered_categories, boundary_positions) where
-    boundary_positions are the y-index positions after which a horizontal
-    divider should be drawn.
+    Categories present in the data but missing from ``order`` are appended
+    (sorted) so they are never silently dropped. ``revisions`` is the shared
+    ``Sub_category -> Category`` mapping; when provided, sub-categories mapping
+    to the same merged category are placed together. Returns
+    (ordered_categories, boundary_positions), where boundary_positions are the
+    y-index positions after which a horizontal divider should be drawn.
     """
     present = [c for c in order if c in dr_dict or c in um_dict]
+    present += sorted((set(dr_dict) | set(um_dict)) - set(order))
     if not revisions:
         return present, []
 
@@ -237,7 +240,8 @@ def build_grouped_order(
         groups.setdefault(key, []).append(c)
 
     # Order groups by the position of their first member in the display order
-    group_keys = sorted(groups.keys(), key=lambda g: min(order.index(c) for c in groups[g]))
+    position = {c: i for i, c in enumerate(present)}
+    group_keys = sorted(groups, key=lambda g: min(position[c] for c in groups[g]))
 
     ordered: list[str] = []
     boundaries: list[int] = []
@@ -315,6 +319,14 @@ def plot_combined(
     logger.success(f"Saved: {output_path.with_suffix('.png')} and {output_path.with_suffix('.pdf')}")
 
 
+def _format_pvalue(pval: float) -> str:
+    """Format a p-value in scientific notation, e.g. ``p=1.2E-9``."""
+    mantissa, exponent = f"{pval:.1e}".split("e")
+    if mantissa.endswith(".0"):
+        mantissa = mantissa[:-2]
+    return f"p={mantissa}E{int(exponent)}"
+
+
 def _draw_pvalue_annotations(
     cats: list[str],
     data_dict: dict[str, list[float]],
@@ -338,8 +350,8 @@ def _draw_pvalue_annotations(
         tick_w = 0.01
         ax.plot([x_bracket, x_bracket + tick_w], [i, i], color="black", linewidth=0.5, clip_on=False)
         ax.plot([x_bracket, x_bracket + tick_w], [i + 1, i + 1], color="black", linewidth=0.5, clip_on=False)
-        # P-value text to the right of the bracket
-        pval_str = f"p={pval:.3f}" if pval >= 0.001 else "p<0.001"
+        # P-value text to the right of the bracket (scientific notation)
+        pval_str = _format_pvalue(pval)
         ax.text(
             x_bracket + tick_w + 0.01, y, pval_str,
             va="center", ha="left",
@@ -386,26 +398,27 @@ def main() -> int:
     logger.info("Loading category config…")
     config = load_category_config(args.revisions)
     logger.info(f"  {len(config.revisions)} sub-categories revised, "
-                f"{len(config.order)} ordered categories")
+                f"{len(config.sub_category_order)} sub-categories ordered, "
+                f"{len(config.category_order)} categories ordered")
 
     # Plot 1: original fine-grained categories (Sub_category)
     logger.info("=== Plot 1: original (Sub_category) ===")
     merged_orig = merged.copy()
     merged_orig["Category"] = merged_orig["Sub_category"]
-    dr_dict = build_value_dict(merged_orig, dit_hap, "DR", config.order)
-    um_dict = build_value_dict(merged_orig, grna, "um", config.order)
+    dr_dict = build_value_dict(merged_orig, dit_hap, "DR", config.sub_category_order)
+    um_dict = build_value_dict(merged_orig, grna, "um", config.sub_category_order)
     logger.info(f"  {len(dr_dict)} DR categories, {len(um_dict)} um categories")
     plot_combined(dr_dict, um_dict, args.output_dir / "DR_um_distribution_original.png",
-                  order=config.order, revisions=config.revisions)
+                  order=config.sub_category_order, revisions=config.revisions)
 
     # Plot 2: merged categories (Category column already has revised merges)
     logger.info("=== Plot 2: revised (merged Category) ===")
     logger.info(f"  {merged['Category'].nunique()} merged categories")
-    dr_dict_rev = build_value_dict(merged, dit_hap, "DR", config.order)
-    um_dict_rev = build_value_dict(merged, grna, "um", config.order)
+    dr_dict_rev = build_value_dict(merged, dit_hap, "DR", config.category_order)
+    um_dict_rev = build_value_dict(merged, grna, "um", config.category_order)
     logger.info(f"  {len(dr_dict_rev)} DR categories, {len(um_dict_rev)} um categories")
     plot_combined(dr_dict_rev, um_dict_rev, args.output_dir / "DR_um_distribution_revised.png",
-                  order=config.order, show_pvalues=True)
+                  order=config.category_order, show_pvalues=True)
 
     return 0
 

@@ -2,16 +2,16 @@
 
 ## Overview
 
-Three test files, 86 tests total, all passing:
+Three test files, 88 tests total, all passing:
 
 ```
 mamba run -n bioinformatics python -m pytest tests/ -v
-86 passed in 0.20s
+88 passed in 0.20s
 ```
 
 - `tests/test_growth_signals.py` — 36 tests (end-to-end classification)
 - `tests/test_classification.py` — 39 tests (Single/Multiple logic)
-- `tests/test_category_revisions.py` — 11 tests (category config loader)
+- `tests/test_category_revisions.py` — 13 tests (category config loader)
 
 ---
 
@@ -188,25 +188,27 @@ description has one or multiple parallel growth phenotypes.
 
 ---
 
-## `tests/test_category_revisions.py` — category config loader (11 tests)
+## `tests/test_category_revisions.py` — category config loader (13 tests)
 
 Tests `load_category_config()` from `scripts/category_revisions.py`, the shared
-loader for the category JSON (one ordered `name -> Category` map).
+loader for the category JSON (`sub_category_order` / `revisions` /
+`category_order`).
 
 | Test | Expected |
 |---|---|
 | Default path points at JSON | `data/4_categorized_genes/category_revisions.json` |
-| Loads config | 33 order entries, 22 revisions; starts `spores`, ends `WT-like` |
-| Order covers both plot rows | merged-only + previously-missing names present |
+| Loads config | 30 sub-categories, 25 revisions, 7 categories |
+| Sub-category order bounds | starts `spores`, ends `WT-like` |
+| Category order | exact list; includes merge target `divided` (regression) |
 | Identity entries are not revisions | `spores` in order but not in revisions |
-| Mappings are flat strings | every key and value non-empty `str` |
-| Order is unique strings | all non-empty `str`, no duplicates |
-| Spot checks | e.g. `spores, some germinated` → `spores, germinated` |
+| Spot checks | e.g. `germinated and divided` → `divided` |
 | No chained merges | a merge target is not itself merged |
 | Missing file | raises `FileNotFoundError` |
 | Non-object JSON | raises `ValueError` |
+| Missing section | raises `ValueError` |
 | Non-string values | raises `ValueError` |
-| Non-idempotent mapping | raises `ValueError` |
+| Duplicate order entry | raises `ValueError` |
+| Non-idempotent revisions | raises `ValueError` |
 
 ---
 

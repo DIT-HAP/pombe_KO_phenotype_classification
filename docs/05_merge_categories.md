@@ -22,8 +22,8 @@ data/4_categorized_genes/                Categorized output from step 04
   phenotypes.xlsx                        (3 data sheets + All genes)
                              ↓
 data/4_categorized_genes/                Hand-curated category config
-  category_revisions.json                (plot order + Sub_category → Category
-                                         merges; shared with step 06)
+  category_revisions.json                (sub-category order, merges,
+                                         category order; shared with step 06)
                              ↓
 data/references/                         DIT-HAP DR values for tier ranking
   all_coding_genes_with_DIT_HAP_clustering.tsv

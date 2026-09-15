@@ -39,7 +39,7 @@ pombe_KO_phenotype_classification/
 │   ├── 2_keyword_profile/  keyword-level analysis per Growth_tier
 │   ├── 3_grouped_genes/    grouped by phenotype consistency
 │   ├── 4_categorized_genes/ categorized phenotypes, inspection pivots
-│   │                        + category_revisions.json (order + merges)
+│   │                        + category_revisions.json (orders + merges)
 │   └── 5_merged_categories/ final merged table + summaries
 ├── results/
 │   ├── Hayles_2013_OB_merged_categories.xlsx

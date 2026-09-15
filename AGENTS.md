@@ -32,7 +32,7 @@ DIT-HAP/gRNA depletion-rate validation.
 ## Testing
 
 ```bash
-mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (86 tests, ~0.2s)
+mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (88 tests, ~0.2s)
 mamba run -n bioinformatics python -m pytest tests/test_growth_signals.py -v
 mamba run -n bioinformatics python -m pytest tests/test_classification.py -v
 mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
@@ -50,9 +50,9 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
 - `scripts/pipeline_utils.py` — shared `setup_logger`, `load_dit_hap`,
   `category_dr_medians`, and the `DEFAULT_RELEASE` constant.
 - `scripts/category_revisions.py` — shared loader for
-  `data/4_categorized_genes/category_revisions.json`, a single ordered
-  `name → Category` map (key order = draw order; `key != value` are the merges).
-  Imported by `05` and `06`.
+  `data/4_categorized_genes/category_revisions.json`, which has three sections:
+  `sub_category_order` (original figure), `revisions` (`Sub_category → Category`
+  merges), `category_order` (revised figure). Imported by `05` and `06`.
 - **Two different "tiers"** — don't conflate them:
   - *signal tier* (1–5): fixed biological hierarchy, internal to
     `classify_growth()`.
@@ -60,10 +60,12 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
     in `04`/`05`. Test expectations use signal tiers.
 - `germination` (noun) is intentionally **not** a growth signal — it appears
   only in morphological contexts; the adjective `germinated` is the signal.
-- Plot draw order and the `Sub_category → Category` merge both live in
-  `data/4_categorized_genes/category_revisions.json`, a single ordered
-  `name → Category` map. Edit that JSON to reorder the figures or change merges;
-  there is no hardcoded order constant anymore.
+- Both figure draw orders and the `Sub_category → Category` merges live in
+  `data/4_categorized_genes/category_revisions.json`
+  (`sub_category_order` / `revisions` / `category_order`). Edit that JSON to
+  reorder the figures or change merges; there is no hardcoded order constant.
+  Categories present in the data but missing from an order list are appended,
+  not dropped.
 
 ## Data gotchas
 
@@ -80,9 +82,9 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
 - Hand-curated, do **not** regenerate or overwrite:
   - `data/references/previous_manual_check_of_insistent_phenotypes/Inconsistent_phenotypes_at_25_32_manual.xlsx`
   - `data/4_categorized_genes/category_revisions.json` — single source of truth for
-    the plot draw order and the `Sub_category → Category` merge used by `05`/`06`.
-    One ordered `name → Category` map (key order = draw order; `key != value` are
-    the merges). Edit this JSON directly. The old
+    both figure draw orders and the `Sub_category → Category` merge used by
+    `05`/`06`. Three sections: `sub_category_order`, `revisions`, `category_order`.
+    Edit this JSON directly. The old
     `Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx` is
     frozen; no script reads it anymore.
 - `data/arc/` and `scripts/arc/` are the **deprecated previous implementation**,

@@ -10,17 +10,26 @@ import pytest
 from category_revisions import DEFAULT_CONFIG, load_category_config
 
 ROOT = Path(__file__).resolve().parent.parent
-
 CONFIG = ROOT / DEFAULT_CONFIG
+
+EXPECTED_CATEGORY_ORDER = [
+    "spores",
+    "germinated",
+    "divided",
+    "microcolonies",
+    "very small colonies",
+    "small colonies",
+    "WT-like",
+]
 
 # Non-identity entries: Sub_category -> merged Category.
 EXPECTED_REVISIONS = {
-    "germinated and divided": "germinated, divided or microcolonies",
-    "germinated, microcolonies": "germinated, divided or microcolonies",
-    "spores, some germinated": "spores, germinated",
-    "spores, some germinated, some divided": "spores, germinated",
+    "spores, some germinated": "germinated",
+    "spores, germinated and divided": "divided",
+    "germinated and divided": "divided",
+    "germinated, microcolonies": "microcolonies",
+    "microcolonies, small colonies": "small colonies",
     "small colonies, some microcolonies": "small colonies",
-    "spores, microcolonies": "spores, miscellaneous",
 }
 
 
@@ -30,32 +39,29 @@ def test_default_path_points_at_json():
 
 def test_loads_config():
     config = load_category_config(CONFIG)
-    assert len(config.order) == 33
-    assert len(config.revisions) == 22
-    assert config.order[0] == "spores"
-    assert config.order[-1] == "WT-like"
+    assert len(config.sub_category_order) == 30
+    assert len(config.revisions) == 25
+    assert len(config.category_order) == 7
 
 
-def test_order_covers_both_plot_rows():
+def test_sub_category_order_bounds():
     config = load_category_config(CONFIG)
-    # Merged-only categories must be in the order for the revised figure.
-    for name in ("spores, miscellaneous", "germinated, divided or microcolonies"):
-        assert name in config.order
-    # Previously-missing sub-categories must be present now.
-    for name in ("germinated and divided", "small colonies, some microcolonies"):
-        assert name in config.order
+    assert config.sub_category_order[0] == "spores"
+    assert config.sub_category_order[-1] == "WT-like"
+
+
+def test_category_order_is_explicit_and_includes_merge_targets():
+    config = load_category_config(CONFIG)
+    assert config.category_order == EXPECTED_CATEGORY_ORDER
+    # Regression: "divided" is a merge target and must be drawn.
+    assert "divided" in config.category_order
+    assert "divided" in set(config.revisions.values())
 
 
 def test_identity_entries_are_not_revisions():
     config = load_category_config(CONFIG)
-    assert "spores" in config.order
+    assert "spores" in config.sub_category_order
     assert "spores" not in config.revisions
-
-
-def test_order_is_unique_strings():
-    config = load_category_config(CONFIG)
-    assert all(isinstance(c, str) and c for c in config.order)
-    assert len(config.order) == len(set(config.order))
 
 
 def test_spot_checks():
@@ -66,7 +72,6 @@ def test_spot_checks():
 
 def test_no_chained_merges():
     config = load_category_config(CONFIG)
-    # A merge target must not itself be merged further.
     assert set(config.revisions.values()) & set(config.revisions) == set()
 
 
@@ -82,15 +87,58 @@ def test_non_object_json_raises(tmp_path):
         load_category_config(path)
 
 
-def test_non_string_values_raise(tmp_path):
+def test_missing_section_raises(tmp_path):
     path = tmp_path / "revisions.json"
-    path.write_text(json.dumps({"a": 1}), encoding="utf-8")
+    path.write_text(
+        json.dumps({"sub_category_order": [], "revisions": {}}), encoding="utf-8"
+    )
     with pytest.raises(ValueError):
         load_category_config(path)
 
 
-def test_non_idempotent_mapping_raises(tmp_path):
+def test_non_string_revision_values_raise(tmp_path):
     path = tmp_path / "revisions.json"
-    path.write_text(json.dumps({"a": "b", "b": "c"}), encoding="utf-8")
+    path.write_text(
+        json.dumps(
+            {
+                "sub_category_order": ["a"],
+                "revisions": {"a": 1},
+                "category_order": ["b"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError):
+        load_category_config(path)
+
+
+def test_duplicate_order_entry_raises(tmp_path):
+    path = tmp_path / "revisions.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sub_category_order": ["a", "a"],
+                "revisions": {},
+                "category_order": ["b"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError):
+        load_category_config(path)
+
+
+def test_non_idempotent_revisions_raise(tmp_path):
+    path = tmp_path / "revisions.json"
+    path.write_text(
+        json.dumps(
+            {
+                "sub_category_order": ["a", "b"],
+                "revisions": {"a": "b", "b": "c"},
+                "category_order": ["c"],
+            }
+        ),
+        encoding="utf-8",
+    )
     with pytest.raises(ValueError):
         load_category_config(path)
