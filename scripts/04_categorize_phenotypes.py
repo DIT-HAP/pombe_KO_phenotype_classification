@@ -13,7 +13,7 @@ Input
   3 sheets: One basic phenotype, Multi basic phenotypes,
   Inconsistent phenotypes.
 
-- ``data/previous_manual_check_of_insistent_phenotypes/
+- ``data/references/previous_manual_check_of_insistent_phenotypes/
    Inconsistent_phenotypes_at_25_32_manual.xlsx``
   Manual annotations for the 131 inconsistent genes.
 
@@ -71,7 +71,7 @@ from pipeline_utils import category_dr_medians, load_dit_hap, setup_logger
 # Paths relative to project root
 DEFAULT_GROUPED = Path("data/3_grouped_genes/Hayles_2013_OB_grouped_genes.xlsx")
 DEFAULT_MANUAL = Path(
-    "data/previous_manual_check_of_insistent_phenotypes"
+    "data/references/previous_manual_check_of_insistent_phenotypes"
     "/Inconsistent_phenotypes_at_25_32_manual.xlsx"
 )
 DEFAULT_OUTPUT = Path(

@@ -21,8 +21,9 @@ modifier prefix (e.g. `some germinated`, `often divided`).
 data/3_grouped_genes/                    Grouped genes from step 03
   Hayles_2013_OB_grouped_genes.xlsx      (4 sheets: one/multi/inconsistent/all)
                              ↓
-data/previous_manual_check_of_           Manual annotations for the
-  insistent_phenotypes/                  131 inconsistent genes
+data/references/                         Manual annotations for the
+  previous_manual_check_of_                131 inconsistent genes
+  insistent_phenotypes/
   Inconsistent_phenotypes_at_25_32_
   manual.xlsx
                              ↓

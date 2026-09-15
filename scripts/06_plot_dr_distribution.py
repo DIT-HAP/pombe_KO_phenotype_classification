@@ -28,8 +28,8 @@ Input
 
 Output
 ------
-- ``results/DR_um_distribution_original.png`` — fine-grained Sub_category
-- ``results/DR_um_distribution_revised.png`` — merged Category with p-values
+- ``results/DR_um_distribution_original.{png,pdf}`` — fine-grained Sub_category
+- ``results/DR_um_distribution_revised.{png,pdf}`` — merged Category with p-values
 
 Usage
 -----
@@ -309,9 +309,10 @@ def plot_combined(
 
     plt.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output_path, dpi=300, bbox_inches="tight")
+    plt.savefig(output_path.with_suffix(".png"), dpi=300, bbox_inches="tight")
+    plt.savefig(output_path.with_suffix(".pdf"), bbox_inches="tight")
     plt.close(fig)
-    logger.success(f"Saved: {output_path}")
+    logger.success(f"Saved: {output_path.with_suffix('.png')} and {output_path.with_suffix('.pdf')}")
 
 
 def _draw_pvalue_annotations(

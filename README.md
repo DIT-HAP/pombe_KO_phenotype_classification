@@ -34,17 +34,19 @@ pombe_KO_phenotype_classification/
 │   ├── raw/                read-only. the original supplementary table.
 │   │   └── rsob130053supp2.xlsx
 │   ├── references/         external data (DIT-HAP, gRNA, PomBase)
+│   │                        + previous_manual_check_.../ (hand-curated)
 │   ├── 1_formatted/        formatted phenotype descriptions
 │   ├── 2_keyword_profile/  keyword-level analysis per Growth_tier
 │   ├── 3_grouped_genes/    grouped by phenotype consistency
 │   ├── 4_categorized_genes/ categorized phenotypes, inspection pivots
 │   │                        + category_revisions.json (order + merges)
-│   ├── 5_merged_categories/ final merged table + summaries
-│   └── previous_manual_check_of_insistent_phenotypes/
+│   └── 5_merged_categories/ final merged table + summaries
 ├── results/
 │   ├── Hayles_2013_OB_merged_categories.xlsx
 │   ├── DR_um_distribution_original.png
-│   └── DR_um_distribution_revised.png
+│   ├── DR_um_distribution_original.pdf
+│   ├── DR_um_distribution_revised.png
+│   └── DR_um_distribution_revised.pdf
 └── scripts/
     ├── 00_download_pombase_annotation.py
     ├── 01_format_and_update_ids.py
@@ -73,11 +75,11 @@ Scripts run in this order:
    `Sub_category → Category` merges (`data/4_categorized_genes/category_revisions.json`),
    re-ranks Growth_tier by DR median
 7. **06_plot_dr_distribution.py** — plots DR (DIT-HAP) and um (gRNA) distributions per category;
-   generates two figures: original (fine-grained Sub_category) and revised (merged Category,
+   generates two figures (each as PNG + PDF): original (fine-grained Sub_category) and revised (merged Category,
    with Mann-Whitney U p-value annotations)
 
 Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx` and
-`results/DR_um_distribution_*.png`.
+`results/DR_um_distribution_*.{png,pdf}`.
 
 ## Key concepts
 

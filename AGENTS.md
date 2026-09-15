@@ -26,7 +26,8 @@ DIT-HAP/gRNA depletion-rate validation.
   it runs *after* `05`, not before `03`. `06_plot_dr_distribution.py` also runs
   after `05`.
 - `05` writes the merged table to both `data/5_merged_categories/` and a
-  committed copy in `results/`. `06` writes the two PNGs to `results/`.
+  committed copy in `results/`. `06` writes each figure as both PNG and PDF to
+  `results/`.
 
 ## Testing
 
@@ -73,8 +74,11 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
   - `all_coding_genes_with_DIT_HAP_clustering.tsv` (`04`/`05`/`06`)
   - `260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv` (`06`)
   - `DIT_HAP.mplstyle` (`06`)
+  The one exception is the hand-curated
+  `previous_manual_check_of_insistent_phenotypes/` subfolder, re-included via
+  `.gitignore` and tracked.
 - Hand-curated, do **not** regenerate or overwrite:
-  - `data/previous_manual_check_of_insistent_phenotypes/Inconsistent_phenotypes_at_25_32_manual.xlsx`
+  - `data/references/previous_manual_check_of_insistent_phenotypes/Inconsistent_phenotypes_at_25_32_manual.xlsx`
   - `data/4_categorized_genes/category_revisions.json` — single source of truth for
     the plot draw order and the `Sub_category → Category` merge used by `05`/`06`.
     One ordered `name → Category` map (key order = draw order; `key != value` are

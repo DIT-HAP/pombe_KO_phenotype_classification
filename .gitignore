@@ -1,5 +1,11 @@
 tmp/
 references/
+# Keep the hand-curated manual-check file tracked (see data/references/)
+!data/references/
+data/references/*
+!data/references/previous_manual_check_of_insistent_phenotypes/
+data/references/previous_manual_check_of_insistent_phenotypes/*
+!data/references/previous_manual_check_of_insistent_phenotypes/Inconsistent_phenotypes_at_25_32_manual.xlsx
 .DS_Store
 __pycache__/
 *.pyc
