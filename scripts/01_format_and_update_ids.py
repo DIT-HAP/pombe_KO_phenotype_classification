@@ -9,12 +9,14 @@ current PomBase annotation to correct identifiers changed by genome
 annotation updates since 2013.
 
 Phase 1 — Data Formatting
+  - Renames the raw Hayles column "Phenotypic classification used for
+    analysis" to "Morphological classification"
   - Strips whitespace from Systematic ID, phenotype description,
-    classification, and dispensability columns
+    morphological classification, and dispensability columns
   - Normalises temperature notation: coerces variants such as
     "25, 32", "25 32", "32, 25" to the canonical "25,32"
   - Drops spurious columns (e.g. 'Unnamed: 12')
-  - Prints summary statistics of phenotypic classification and
+  - Prints summary statistics of morphological classification and
     gene dispensability categories
 
 Phase 2 — Gene ID Mapping
@@ -85,7 +87,7 @@ import pandas as pd
 from loguru import logger
 
 # 4. Local Imports
-from pipeline_utils import DEFAULT_RELEASE, setup_logger
+from pipeline_utils import CLASSIFICATION_COL, DEFAULT_RELEASE, setup_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS & ENUMS
@@ -110,6 +112,9 @@ DEFAULT_ANNOTATION = (
 DEFAULT_OUTPUT = Path("data/1_formatted/Hayles_2013_OB_formatted_phenotypes.xlsx")
 DEFAULT_CHANGELOG = Path("data/1_formatted/gene_id_mapping_changelog.xlsx")
 
+# Raw Hayles column renamed to CLASSIFICATION_COL in the formatted output.
+RAW_CLASSIFICATION_COL = "Phenotypic classification used for analysis"
+
 # =============================================================================
 # LOGGING SETUP
 # =============================================================================
@@ -125,6 +130,9 @@ setup_logger()
 @logger.catch
 def format_phenotype_data(df: pd.DataFrame) -> pd.DataFrame:
     """Clean whitespace and normalise temperature notation in phenotype columns."""
+    # Rename the classification column to its explicit morphology label
+    df = df.rename(columns={RAW_CLASSIFICATION_COL: CLASSIFICATION_COL})
+
     # Strip whitespace from key columns
     df["Systematic ID"] = df["Systematic ID"].str.strip()
     df["Deletion mutant phenotype description"] = (
@@ -133,9 +141,7 @@ def format_phenotype_data(df: pd.DataFrame) -> pd.DataFrame:
         .str.strip(".")
         .str.strip()
     )
-    df["Phenotypic classification used for analysis"] = (
-        df["Phenotypic classification used for analysis"].str.strip()
-    )
+    df[CLASSIFICATION_COL] = df[CLASSIFICATION_COL].str.strip()
     df["Gene dispensability. This study"] = (
         df["Gene dispensability. This study"].str.strip()
     )
@@ -151,8 +157,8 @@ def format_phenotype_data(df: pd.DataFrame) -> pd.DataFrame:
 
     # Summary statistics
     logger.info(
-        "Classification categories:\n{}",
-        df["Phenotypic classification used for analysis"].value_counts().to_string(),
+        "Morphological classification categories:\n{}",
+        df[CLASSIFICATION_COL].value_counts().to_string(),
     )
     logger.info(
         "Dispensability categories:\n{}",

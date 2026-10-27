@@ -63,7 +63,12 @@ from loguru import logger
 
 # 3b. Local modules
 from growth_signals import GROWTH_SIGNALS, classify_growth
-from pipeline_utils import category_dr_medians, load_dit_hap, setup_logger
+from pipeline_utils import (
+    CLASSIFICATION_COL,
+    category_dr_medians,
+    load_dit_hap,
+    setup_logger,
+)
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -266,10 +271,10 @@ def main() -> int:
             df, "Gene dispensability. This study", "Category"
         )
         pivots[f"Classification pivot ({label})"] = build_pivot(
-            df, "Phenotypic classification used for analysis", "Category"
+            df, CLASSIFICATION_COL, "Category"
         )
         pivots[f"Growth_tier pivot ({label})"] = build_pivot(
-            df, "Phenotypic classification used for analysis", "Growth_tier"
+            df, CLASSIFICATION_COL, "Growth_tier"
         )
 
     # Also build a combined "All genes" pivot for the full description

@@ -3,8 +3,8 @@ Shared Pipeline Utilities
 =========================
 
 Small helpers used by more than one pipeline step: logging setup, the
-PomBase release constant, and reference-table loading (DIT-HAP / gRNA) with
-DR-median ranking.
+PomBase release constant, the morphological-classification column name, and
+reference-table loading (DIT-HAP / gRNA) with DR-median ranking.
 
 DIT-HAP ``DR`` is sign-flipped: it is negative, and a more negative value
 means more severe depletion. ``category_dr_medians`` therefore sorts
@@ -45,6 +45,9 @@ from loguru import logger
 
 # PomBase monthly release, shared by 00 (download) and 01 (ID mapping).
 DEFAULT_RELEASE = "2026-06-01"
+
+# Morphological-classification column, produced by 01 and consumed by 04.
+CLASSIFICATION_COL = "Morphological classification"
 
 
 # =============================================================================

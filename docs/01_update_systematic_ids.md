@@ -7,12 +7,14 @@
 Performs two sequential operations on the Hayles 2013 supplementary table:
 
 **Phase 1 — Data formatting:**
+- Renames the raw Hayles column `Phenotypic classification used for analysis`
+  to `Morphological classification`
 - Strips whitespace from key columns (Systematic ID, phenotype descriptions,
-  classification, dispensability)
+  morphological classification, dispensability)
 - Normalises temperature notation (coerces all variants of `"25, 32"`,
   `"25 32"`, `"32, 25"` to `"25,32"`)
 - Drops spurious columns (e.g., `Unnamed: 12`)
-- Prints summary statistics of classification and dispensability
+- Prints summary statistics of morphological classification and dispensability
 
 **Phase 2 — Gene ID mapping:**
 Maps the 4,843 gene systematic IDs against a current PomBase annotation
@@ -133,8 +135,10 @@ gene symbol in the current PomBase annotation (systematic-ID-only entries).
 
 ### `data/1_formatted/Hayles_2013_OB_formatted_phenotypes.xlsx`
 
-Extends the original 12-column structure with three extra columns that
-preserve the pre‑mapping state for traceability:
+Renames the raw `Phenotypic classification used for analysis` column to
+`Morphological classification`, and extends the original 12-column structure
+with three extra columns that preserve the pre‑mapping state for
+traceability:
 
 | New column | Description |
 |---|---|
