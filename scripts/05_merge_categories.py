@@ -16,7 +16,7 @@ Input
   Hand-curated category config (plot order + ``Sub_category -> Category``
   merge mapping), shared with step 06.
 
-- ``data/references/gene_level_fitting_statistics_minusDR.tsv``
+- ``data/raw/gene_level_fitting_statistics_minusDR.tsv``
   Sign-flipped DIT-HAP DR values used for Growth_tier re-ranking
   (negative = more depleted).
 
@@ -68,7 +68,7 @@ DEFAULT_RESULTS = Path(
     "results/Hayles_2013_OB_merged_categories.xlsx"
 )
 DEFAULT_DIT_HAP = Path(
-    "data/references/gene_level_fitting_statistics_minusDR.tsv"
+    "data/raw/gene_level_fitting_statistics_minusDR.tsv"
 )
 
 # =============================================================================

@@ -17,7 +17,7 @@ Input
    Inconsistent_phenotypes_at_25_32_manual.xlsx``
   Manual annotations for the 131 inconsistent genes.
 
-- ``data/references/gene_level_fitting_statistics_minusDR.tsv``
+- ``data/raw/gene_level_fitting_statistics_minusDR.tsv``
   Sign-flipped DIT-HAP DR values used for Growth_tier re-ranking
   (negative = more depleted).
 
@@ -43,8 +43,8 @@ Usage
     mamba run -n bioinformatics python scripts/04_categorize_phenotypes.py --verbose
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
-Date:     2026-06-09
-Version:  1.2.0
+Date:     2026-10-28
+Version:  1.2.1
 """
 
 # =============================================================================
@@ -62,6 +62,7 @@ import pandas as pd
 from loguru import logger
 
 # 3b. Local modules
+from dataset_merge import HAYLES_STUDY_COL
 from growth_signals import GROWTH_SIGNALS, classify_growth
 from pipeline_utils import (
     CLASSIFICATION_COL,
@@ -84,7 +85,7 @@ DEFAULT_OUTPUT = Path(
     "data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx"
 )
 DEFAULT_DIT_HAP = Path(
-    "data/references/gene_level_fitting_statistics_minusDR.tsv"
+    "data/raw/gene_level_fitting_statistics_minusDR.tsv"
 )
 
 # Reverse lookup: known category name → growth tier.
@@ -268,7 +269,7 @@ def main() -> int:
             df, "Deletion mutant phenotype description", "Category"
         )
         pivots[f"Essentiality pivot ({label})"] = build_pivot(
-            df, "Gene dispensability. This study", "Category"
+            df, HAYLES_STUDY_COL, "Category"
         )
         pivots[f"Classification pivot ({label})"] = build_pivot(
             df, CLASSIFICATION_COL, "Category"

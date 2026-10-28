@@ -5,47 +5,78 @@ DR / um Distribution by Phenotype Category
 Reads the merged phenotype classification and joins it with two external
 datasets — DIT-HAP (DR/DL) and gRNA (um/lam) — then plots the distribution
 of depletion-rate proxies (DR for DIT-HAP, um for gRNA) across phenotype
-categories using violin + box plots with statistics annotations.
+categories using ``cnsplots`` violin + box plots with statistics annotations.
 
 Both proxies are sign-flipped so that **more negative = more depleted**.
 The DIT-HAP file already stores flipped ``DR`` values; gRNA ``um`` is
-negated here on load for consistency. The x-axis range covers both flipped
-datasets.
+negated here on load for consistency. The x-axis range covers both datasets.
 
-Generates two figures:
-- **Original** — fine-grained Sub_category (grouped by revised category,
-  with dashed dividers between groups).
-- **Revised** — merged Category with Mann-Whitney U p-value annotations
-  between adjacent categories, shown in scientific notation (p < 0.05
-  highlighted in bold red).
+Each figure holds three panels that share one category axis:
+
+- **A** — DIT-HAP depletion ``DR`` (sign-flipped: more negative = depleted).
+- **B** — gRNA depletion ``um`` (negated on load, same convention).
+- **C** — sample size and median per row for both proxies, one table row each.
+  Keeping them off the tick labels leaves
+  those single-line, which lets the rows sit closer together. The figure
+  carrying p-value brackets closes the panel with one further line naming the
+  test behind them.
+
+Rows are phenotype categories; the violin shows the density and the embedded
+white box the median/IQR. The two proxies do not cover the same genes (gRNA has
+524 genes without a DIT-HAP value), so the per-row sample sizes legitimately
+differ between panels A and B — panel C reports them separately rather than as
+one shared ``(n = … / …)``.
+
+Two figures are produced:
+
+- **original** — fine-grained ``Sub_category`` rows, filled by their merged
+  group. Rows of one merged category are kept together and the groups follow
+  the merged-category draw order, with dashed dividers between them.
+- **revised** — merged ``Category`` rows with two-sided Mann-Whitney U
+  brackets between adjacent categories (raw p-values, no multiple-comparison
+  correction). Every bracket sits on one vertical
+  column right of its panel, labelled with the exact p-value: red and bold
+  when significant (p < 0.05), grey otherwise. Because every adjacent pair is
+  annotated, each bracket stops short of its two rows so neighbouring brackets
+  stay separate instead of fusing into one continuous bar.
+  ``cnsplots``'s own ``pairs=``
+  annotation is not used because it staircases the brackets outwards and
+  cannot colour them by significance.
 
 Input
 -----
 - ``data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx``
-  (sheet ``All genes``) — must contain ``Systematic ID``,
-  ``Deletion mutant phenotype description``, ``Sub_category``, and ``Category``.
-- ``data/references/gene_level_fitting_statistics_minusDR.tsv``
-  — must contain ``Systematic ID`` and sign-flipped ``DR``
-  (negative = depleted).
-- ``data/references/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv``
-  — must contain ``Systematic ID`` and ``um`` (negated on load).
+  (sheet ``All genes``) — ``Systematic ID``, ``Sub_category``, ``Category``.
+- ``data/raw/gene_level_fitting_statistics_minusDR.tsv``
+  — ``Systematic ID`` and sign-flipped ``DR``.
+- ``data/raw/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv``
+  — ``Systematic ID`` and ``um`` (negated on load).
 - ``data/4_categorized_genes/category_revisions.json``
-  — shared category config: display ``order`` plus the ``Sub_category -> Category``
-  merge mapping used to group the original figure.
+  — draw orders plus the ``Sub_category -> Category`` merges.
 
 Output
 ------
-- ``results/DR_um_distribution_original.{png,pdf}`` — fine-grained Sub_category
-- ``results/DR_um_distribution_revised.{png,pdf}`` — merged Category with p-values
+- ``results/DR_um_distribution_original.{png,pdf}`` — 2616 x 1197 px
+- ``results/DR_um_distribution_revised.{png,pdf}`` — 2171 x 594 px
+
+Both are sized to those pixels at the 288 dpi savefig default by per-figure
+geometry constants near the top of the file (calibrated by rendering and
+measuring; see the per-figure zoom block), so the two figures differ in row
+height, panel width and — for the tall one — text scale. Width, unlike height,
+is content-tight: the export crops to the drawn extent, so narrowing any panel
+narrows the image by the same amount.
+
+Every element of both figures — axis labels, tick labels and panel C's table
+alike — is set in one face, Arial (``FONT_FAMILY``).
 
 Usage
 -----
-    mamba run -n bioinformatics python scripts/06_plot_dr_distribution.py
-    mamba run -n bioinformatics python scripts/06_plot_dr_distribution.py --verbose
+    mamba run -n cnsplots python scripts/06_plot_dr_distribution.py
+    mamba run -n cnsplots python scripts/06_plot_dr_distribution.py --verbose
 
-Author:   Yusheng Yang (guidance) + Hermes (implementation)
-Date:     2026-07-02
-Version:  1.1.0
+Author:   Yusheng Yang (guidance) + Claude Code (implementation)
+Date:     2026-10-13
+Version:  1.0.0
 """
 
 # =============================================================================
@@ -55,312 +86,581 @@ Version:  1.1.0
 # 1. Standard Library Imports
 import argparse
 import sys
+from dataclasses import dataclass
+from functools import partial
+from itertools import pairwise
 from pathlib import Path
 
 # 2. Data Processing Imports
-import numpy as np
 import pandas as pd
 
 # 3. Third-party Imports
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-plt.style.use("data/references/DIT_HAP.mplstyle")
+import cnsplots as cns
+import matplotlib.colors as mcolors
 from loguru import logger
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+from matplotlib.font_manager import FontProperties
+from matplotlib.patches import Patch
+from matplotlib.text import Text
+from matplotlib.textpath import TextPath
 from scipy.stats import mannwhitneyu
 
 # 4. Local Imports
-from category_revisions import DEFAULT_CONFIG, load_category_config
+from category_revisions import DEFAULT_CONFIG, CategoryConfig, load_category_config
 from pipeline_utils import load_dit_hap, load_grna, setup_logger
 
 # =============================================================================
-# GLOBAL CONSTANTS
+# GLOBAL CONSTANTS & ENUMS
 # =============================================================================
+
+# The face every element of both figures is drawn in. The fallbacks only come
+# into play on a machine without Arial.
+FONT_FAMILY = "Arial"
 
 DEFAULT_MERGED = Path("data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx")
-DEFAULT_DIT_HAP = Path("data/references/gene_level_fitting_statistics_minusDR.tsv")
-DEFAULT_GRNA = Path("data/references/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv")
+DEFAULT_DIT_HAP = Path("data/raw/gene_level_fitting_statistics_minusDR.tsv")
+DEFAULT_GRNA = Path("data/raw/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv")
 DEFAULT_OUTPUT_DIR = Path("results")
 
-AX_WIDTH = 5
-AX_HEIGHT = 8
+MERGED_SHEET = "All genes"
+ID_COL = "Systematic ID"
+SUB_CATEGORY_COL = "Sub_category"
+CATEGORY_COL = "Category"
 
-# Covers both sign-flipped proxies: DIT-HAP DR ≈ [-2.09, 0.17],
-# gRNA um (negated) ≈ [-1.81, 0.17].
+# Internal long-form column names handed to cnsplots.
+VALUE_COL = "Value"
+ROW_COL = "Row label"
+GROUP_COL = "Merged category"
+
+# Panel geometry in points (1/72 inch). Row height must fit one 8 pt tick label
+# (≈ 11 pt tall) and one 7 pt stats line, so it bounds how low the figure can go.
+# The two figures carry very different row counts — 50 vs 7 — and are limited by
+# different dimensions, so each spec scales the base geometry for its own figure
+# (see the spec builders): the tall one trades row height for height, the wide
+# one trades panel width for width.
+PLOT_WIDTH_PT = 185
+ROW_HEIGHT_PT = 18
+# --- per-figure zoom ---------------------------------------------------------
+# Each figure independently scales the design geometry above to reach its target
+# pixel size at the 288 dpi savefig default. The values are calibrated by
+# rendering and measuring the saved PNG — multipanel's panel units do not map
+# linearly to output pixels, so they cannot be computed from the target alone.
+
+# 50 rows, height-limited (≈1200 px tall). Row height the layout and its text
+# sizes are designed at: there, the one-line labels of adjacent rows just fit.
+DESIGN_ROW_HEIGHT_PT = 14.2
+ORIGINAL_ROW_HEIGHT_PT = 9.115
+ORIGINAL_PLOT_WIDTH_PT = 142.4
+# Text zooms with the rows. Leaving it full size while rows tighten is what makes
+# adjacent labels collide, so this is derived, never set by hand.
+ORIGINAL_FONT_SCALE = round(ORIGINAL_ROW_HEIGHT_PT / DESIGN_ROW_HEIGHT_PT, 3)
+
+# 7 rows, width-limited (≈600 px tall). Rows stay near the design height, so the
+# text keeps its natural size; the x axis keeps three ticks at this panel width
+# (matplotlib drops the 0.5 ones).
+REVISED_ROW_HEIGHT_PT = 16.89
+REVISED_PLOT_WIDTH_PT = 69.25
+PAD_LEFT_PT = 12
+PAD_TOP_PT = 12
+MARGIN_RIGHT_PT = 16
+# The stats panel is a table: one set of probe / count / median columns per
+# proxy, on a row per category. The figure's face is proportional, so a column
+# cannot be aligned by padding spaces inside one string — each cell is placed at
+# its own x instead, and the columns are sized from their widest cell (measured
+# at STATS_FONTSIZE, i.e. before the per-figure font zoom; see stats_columns).
+# Counts and medians are right-aligned, which lines their digits up.
+STATS_ALIGN = ("left", "right", "right")
+STATS_COLUMN_GAP_PT = 5
+STATS_GROUP_GAP_PT = 13
+STATS_PAD_PT = 12
+STATS_SLACK_PT = 10
+STATS_FONTSIZE = 7
+# Annotated panels reserve room for the bracket column and its labels
+# ("p=8.7E-128" is the longest label at 36 pt in Arial Bold at PVALUE_FONTSIZE,
+# so the column needs PVALUE_GAP_PT + PVALUE_TICK_PT + PVALUE_TEXT_PT + 36 ≈
+# 49 pt, plus a little air before the next panel's tick labels).
+PVALUE_MARGIN_PT = 60
+CANVAS_SLACK_PT = 190
+LABEL_CHAR_PT = 4.4
+
+# Matches the sign-flipped range covered by both proxies.
 VALUE_RANGE = (-2.2, 0.3)
 
-CATEGORY_COLOR_MAP: dict[str, str] = {
-    "WT-like": "#4DAF4A",
-    "spores": "#377EB8",
-    "germinated": "#984EA3",
-    "germinated, spores": "#7B68A6",
-    "spores, germinated, divided or microcolonies": "#6B8DB5",
-    "some germinated, spores": "#9E7BB5",
-    "germinated and divided": "#F781BF",
-    "germinated, divided or microcolonies": "#E7298A",
-    "germinated and divided, spores": "#E7298A",
-    "germinated, some divided": "#FF7F0E",
-    "germinated, often divided": "#FFA040",
-    "germinated, occasionally divided": "#FFB870",
-    "germinated, some divided, spores": "#E67E22",
-    "germinated, occasionally divided, spores": "#D35400",
-    "germinated, often divided, spores": "#C0392B",
-    "germinated, occasionally microcolonies, spores": "#8E44AD",
-    "germinated, some microcolonies, spores": "#9B59B6",
-    "germinated, occasionally microcolonies": "#A569BD",
-    "germinated, some microcolonies": "#BB8FCE",
-    "germinated, microcolonies": "#A67800",
-    "germinated, microcolonies, spores": "#BF9B30",
-    "microcolonies": "#FFD92F",
-    "microcolonies, small colonies": "#E6AB02",
-    "microcolonies, spores": "#D4B020",
-    "some microcolonies, spores": "#C8B860",
-    "microcolonies, occasionally germinated, occasionally spores": "#D0B850",
-    "small colonies": "#A65628",
-    "very small colonies": "#7A3D1B",
-    "germinated, small colonies, spores": "#B07843",
-    "septated": "#999999",
-    "?": "#666666",
-    "spores, germinated spores": "#5B7C99",
-    "spores, germinated spores and colonies": "#4A6B85",
-    "spores, germinated spores and divided": "#3A5A75",
-    "some divided, some germinated, spores": "#6B8DB5",
-    "germinated, occasional microcolonies, spores": "#8B7500",
-    "small colonies, some microcolonies": "#8B4513",
-}
+# P-value column: one column of brackets right of the axes (never staircased,
+# which would overlap on a dense category axis). Offsets are points from the
+# axes' right edge, converted to axes fractions at draw time; y stays in
+# category (data) units. Ticks run outward from each row to the vertical bar,
+# so the bracket closes on the outer side and points back at the pair it spans,
+# matching statannotations' layout.
+PVALUE_GAP_PT = 6
+PVALUE_TICK_PT = 3
+PVALUE_TEXT_PT = 4
+# Every adjacent pair is annotated, so the brackets tile the axis and their bars
+# would fuse into one continuous line. Each bracket ends PVALUE_INSET_PT short
+# of its two row centres (converted with the row pitch at draw time), leaving a
+# gap to the bracket above and below it.
+PVALUE_INSET_PT = 3
+PVALUE_FONTSIZE = 7
+PVALUE_ALPHA = 0.05
+PVALUE_SIGNIFICANT_COLOR = "red"
+PVALUE_NEUTRAL_COLOR = "0.45"
+# Footnote closing panel C in the annotated figure: what the brackets measure.
+# It is one line under the last row, so its length also sets the panel width.
+PVALUE_NOTE = "p: two-sided Mann-Whitney U (uncorrected)"
+
 
 # =============================================================================
-# CORE LOGIC
+# CONFIGURATION & DATACLASSES
+# =============================================================================
+
+
+@dataclass(kw_only=True, slots=True, frozen=True)
+class Panel:
+    """One proxy panel: its long-form frame, value-axis label, and short name."""
+
+    frame: pd.DataFrame
+    xlabel: str
+    short_label: str
+
+
+@dataclass(kw_only=True, slots=True, frozen=True)
+class FigureSpec:
+    """Everything one output figure needs besides the loaded config."""
+
+    name: str
+    row_order: list[str]
+    row_groups: dict[str, str]
+    panels: list[Panel]
+    boundaries: list[float]
+    pairs: list[tuple[str, str]]
+    output_path: Path
+    show_legend: bool
+    # Line appended under panel C's rows, or ``None`` when the figure carries no
+    # p-value brackets to explain.
+    pvalue_note: str | None
+    row_height_pt: float
+    plot_width_pt: float
+    font_scale: float
+
+
+# =============================================================================
+# DATA PREPARATION
 # =============================================================================
 
 
 def load_merged(path: Path) -> pd.DataFrame:
-    """Load merged categories with Systematic ID, description, Sub_category, and Category."""
-    df = pd.read_excel(path, sheet_name="All genes")
-    cols = ["Systematic ID", "Deletion mutant phenotype description"]
-    if "Sub_category" in df.columns:
-        cols.append("Sub_category")
-    cols.append("Category")
-    return df[cols].copy()
+    """Load the merged classification with systematic ID, sub-category and category."""
+    df = pd.read_excel(path, sheet_name=MERGED_SHEET)
+    return df[[ID_COL, SUB_CATEGORY_COL, CATEGORY_COL]].copy()
 
 
-def build_value_dict(
+def build_long_frame(
     merged: pd.DataFrame,
     values: pd.DataFrame,
     value_col: str,
-    order: list[str],
-) -> dict[str, list[float]]:
-    """Join merged categories with a value column and group by Category."""
-    joined = merged.merge(values, on="Systematic ID", how="inner")
-    result: dict[str, list[float]] = {}
-    # Use the configured order first, then append new categories not in it
-    all_cats = list(order) + [
-        c for c in sorted(joined["Category"].unique())
-        if c not in order
-    ]
-    for cat in all_cats:
-        vals = joined.loc[joined["Category"] == cat, value_col].tolist()
-        if vals:
-            result[cat] = vals
-    return result
-
-
-def horizontal_violin_box(categories: list[str], data: list[list[float]], ax: plt.Axes, colors: list[str]) -> None:
-    """Draw horizontal violin + boxplot; x=value, y=category index."""
-    positions = range(len(categories))
-
-    # KDE requires ≥2 points; for single-element lists, skip violin
-    violin_data: list[list[float]] = []
-    violin_pos: list[int] = []
-    for i, vals in enumerate(data):
-        clean = [v for v in vals if not np.isnan(v)]
-        if len(clean) >= 2:
-            violin_data.append(clean)
-            violin_pos.append(i)
-
-    if violin_data:
-        parts = ax.violinplot(
-            violin_data,
-            positions=violin_pos,
-            showmeans=False,
-            showmedians=False,
-            showextrema=False,
-            vert=False,
-        )
-        for j, pc in enumerate(parts["bodies"]):
-            idx = violin_pos[j]
-            pc.set_facecolor(colors[idx])
-            pc.set_alpha(0.3)
-            pc.set_edgecolor(colors[idx])
-
-    bp = ax.boxplot(
-        data,
-        positions=positions,
-        vert=False,
-        widths=0.15,
-        patch_artist=True,
-        showfliers=True,
-        flierprops={"marker": ".", "markersize": 2, "alpha": 0.5},
+    *,
+    row_col: str,
+    group_col: str,
+) -> pd.DataFrame:
+    """Join one proxy's values onto the merged table and reshape to long form."""
+    joined = merged.merge(values, on=ID_COL, how="inner")
+    frame = pd.DataFrame(
+        {
+            VALUE_COL: joined[value_col].to_numpy(),
+            ROW_COL: joined[row_col].to_numpy(),
+            GROUP_COL: joined[group_col].to_numpy(),
+        }
     )
-    for i, box in enumerate(bp["boxes"]):
-        box.set_facecolor(colors[i])
-        box.set_alpha(0.7)
-    for element in ["whiskers", "caps", "medians"]:
-        for item in bp[element]:
-            item.set_color("black")
-            item.set_linewidth(0.8)
-
-    ax.set_yticks(positions)
-    ax.set_yticklabels(categories)
-    ax.set_xlim(*VALUE_RANGE)
+    # The loaders already drop missing values; the guard keeps the per-row
+    # sample sizes honest if a different reference table is passed in.
+    return frame.dropna(subset=[VALUE_COL])
 
 
-def build_grouped_order(
-    dr_dict: dict[str, list[float]],
-    um_dict: dict[str, list[float]],
-    order: list[str],
-    revisions: dict[str, str] | None = None,
-) -> tuple[list[str], list[int]]:
-    """Build category order, optionally grouped by revised category.
+def build_group_order(frames: list[pd.DataFrame], category_order: list[str]) -> list[str]:
+    """Order merged categories as configured, appending any unlisted ones."""
+    present = set().union(*(set(frame[GROUP_COL]) for frame in frames))
+    ordered = [cat for cat in category_order if cat in present]
+    return ordered + sorted(present - set(ordered))
 
-    Categories present in the data but missing from ``order`` are appended
-    (sorted) so they are never silently dropped. ``revisions`` is the shared
-    ``Sub_category -> Category`` mapping; when provided, sub-categories mapping
-    to the same merged category are placed together. Returns
-    (ordered_categories, boundary_positions), where boundary_positions are the
-    y-index positions after which a horizontal divider should be drawn.
+
+def build_group_colors(group_order: list[str]) -> dict[str, str]:
+    """Map each merged category to a colour from the cnsplots qualitative palette."""
+    palette = [mcolors.to_hex(tuple(color)) for color in cns.palettes(cns.settings.palette_qual)]
+    if len(group_order) > len(palette):
+        logger.warning(
+            f"{len(group_order)} groups exceed the {len(palette)}-colour cnsplots "
+            f"palette '{cns.settings.palette_qual}'; colours repeat."
+        )
+    return {group: palette[i % len(palette)] for i, group in enumerate(group_order)}
+
+
+def build_sub_category_rows(
+    panels: list[Panel],
+    sub_category_order: list[str],
+    category_order: list[str],
+    row_groups: dict[str, str],
+) -> tuple[list[str], list[float]]:
+    """Group sub-categories under their merged category and return row order plus dividers."""
+    # Both proxies must be represented: gRNA covers sub-categories DIT-HAP does not.
+    present = set().union(*(set(panel.frame[ROW_COL]) for panel in panels))
+    listed = [sub for sub in sub_category_order if sub in present]
+    listed += sorted(present - set(listed))
+
+    # Sub-categories keep their configured relative order inside each merged
+    # category; the groups themselves follow the merged-category draw order.
+    grouped: dict[str, list[str]] = {}
+    for sub in listed:
+        grouped.setdefault(row_groups[sub], []).append(sub)
+
+    groups = [group for group in category_order if group in grouped]
+    groups += sorted(set(grouped) - set(groups))
+
+    rows = [sub for group in groups for sub in grouped[group]]
+    boundaries = []
+    filled = 0
+    for group in groups[:-1]:
+        filled += len(grouped[group])
+        boundaries.append(filled - 0.5)
+    return rows, boundaries
+
+
+def build_stats_rows(spec: FigureSpec) -> list[list[str]]:
+    """Panel C's cells: one list of that row's column strings per category.
+
+    Each proxy contributes a probe label, a sample size and a median, in that
+    order, so the columns repeat every ``len(STATS_ALIGN)`` entries.
     """
-    present = [c for c in order if c in dr_dict or c in um_dict]
-    present += sorted((set(dr_dict) | set(um_dict)) - set(order))
-    if not revisions:
-        return present, []
-
-    # Group present categories by their revised category (or self if no revision)
-    groups: dict[str, list[str]] = {}
-    for c in present:
-        key = revisions.get(c, c)
-        groups.setdefault(key, []).append(c)
-
-    # Order groups by the position of their first member in the display order
-    position = {c: i for i, c in enumerate(present)}
-    group_keys = sorted(groups, key=lambda g: min(position[c] for c in groups[g]))
-
-    ordered: list[str] = []
-    boundaries: list[int] = []
-    for g in group_keys:
-        ordered.extend(groups[g])
-        if g != group_keys[-1]:
-            boundaries.append(len(ordered) - 1)  # draw line after this position
-
-    return ordered, boundaries
+    tables = [
+        (panel.short_label, panel.frame.groupby(ROW_COL)[VALUE_COL].agg(["size", "median"]))
+        for panel in spec.panels
+    ]
+    rows = []
+    for row in spec.row_order:
+        cells = []
+        for label, table in tables:
+            if row in table.index:
+                cells += [
+                    f"{label}:",
+                    f"n={int(table.loc[row, 'size'])}",
+                    f"med={table.loc[row, 'median']:.3f}",
+                ]
+            else:
+                cells += [f"{label}:", "n=-", "med=-"]
+        rows.append(cells)
+    return rows
 
 
-def plot_combined(
-    dr_dict: dict[str, list[float]],
-    um_dict: dict[str, list[float]],
-    output_path: Path,
+def text_width_pt(text: str, fontsize: float, weight: str) -> float:
+    """Width of one string in points, as the figure's own face draws it."""
+    prop = FontProperties(family=FONT_FAMILY, weight=weight, size=fontsize)
+    return TextPath((0, 0), text, prop=prop, size=fontsize).get_extents().width
+
+
+def stats_columns(spec: FigureSpec) -> tuple[list[tuple[float, float]], float]:
+    """Panel C's column edges in points — ``(left, right)`` each — and its width.
+
+    Every column is as wide as its widest cell at the size this figure draws its
+    text at. The panel is then as wide as either the table or the footnote under
+    it, whichever is longer.
+    """
+    rows = build_stats_rows(spec)
+    fontsize = STATS_FONTSIZE * spec.font_scale
+    widths = [
+        max(text_width_pt(row[column], fontsize, "bold") for row in rows)
+        for column in range(len(rows[0]))
+    ]
+    edges: list[tuple[float, float]] = []
+    cursor = 0.0
+    for column, width in enumerate(widths):
+        if column:
+            gap = STATS_GROUP_GAP_PT if column % len(STATS_ALIGN) == 0 else STATS_COLUMN_GAP_PT
+            cursor += gap * spec.font_scale
+        edges.append((cursor, cursor + width))
+        cursor += width
+    if spec.pvalue_note:
+        cursor = max(cursor, text_width_pt(spec.pvalue_note, fontsize, "normal"))
+    return edges, cursor
+
+
+def adjacent_pairs(order: list[str], panels: list[Panel]) -> list[tuple[str, str]]:
+    """Adjacent category pairs holding at least two observations in every panel."""
+    counts = [panel.frame[ROW_COL].value_counts() for panel in panels]
+    pairs = []
+    for first, second in pairwise(order):
+        sizes_present = [
+            int(table.get(row, 0)) for table in counts for row in (first, second)
+        ]
+        if min(sizes_present) >= 2:
+            pairs.append((first, second))
+    return pairs
+
+
+# =============================================================================
+# STATISTICS LOGGING
+# =============================================================================
+
+
+def pair_pvalue(frame: pd.DataFrame, first: str, second: str) -> float:
+    """Two-sided Mann-Whitney U p-value between two rows of one panel."""
+    left = frame.loc[frame[ROW_COL] == first, VALUE_COL]
+    right = frame.loc[frame[ROW_COL] == second, VALUE_COL]
+    return float(mannwhitneyu(left, right, alternative="two-sided").pvalue)
+
+
+def format_pvalue(pvalue: float) -> str:
+    """Format a p-value in scientific notation, e.g. ``p=1.2E-9``."""
+    mantissa, exponent = f"{pvalue:.1e}".split("e")
+    return f"p={mantissa.removesuffix('.0')}E{int(exponent)}"
+
+
+def log_category_stats(order: list[str], panels: list[Panel]) -> None:
+    """Log per-category sample size and median for every proxy."""
+    for panel in panels:
+        stats = panel.frame.groupby(ROW_COL)[VALUE_COL].agg(["size", "median"])
+        logger.info(f"  {panel.xlabel} — n / median per category")
+        for row in order:
+            if row in stats.index:
+                logger.info(f"    {row:<60} n={int(stats.loc[row, 'size']):<5} med={stats.loc[row, 'median']:.3f}")
+
+
+def log_pvalues(pairs: list[tuple[str, str]], panels: list[Panel]) -> None:
+    """Log the two-sided Mann-Whitney U p-value of every annotated pair and panel."""
+    for panel in panels:
+        logger.info(f"  {panel.xlabel} — two-sided Mann-Whitney U (no correction)")
+        for first, second in pairs:
+            logger.info(f"    {first:<32} vs {second:<32} p={pair_pvalue(panel.frame, first, second):.3e}")
+
+
+# =============================================================================
+# PLOTTING
+# =============================================================================
+
+
+def annotate_pairs(
+    ax: Axes,
     order: list[str],
-    revisions: dict[str, str] | None = None,
-    show_pvalues: bool = False,
+    frame: pd.DataFrame,
+    pairs: list[tuple[str, str]],
+    plot_width_pt: float,
+    row_height_pt: float,
+    font_scale: float,
 ) -> None:
-    """Plot sign-flipped DR (DIT-HAP) and um (gRNA) side by side with statistics panel."""
-    all_cats, boundaries = build_grouped_order(dr_dict, um_dict, order, revisions)
-    colors = [CATEGORY_COLOR_MAP.get(c, "gray") for c in all_cats]
+    """Draw every adjacent-pair p-value on one bracket column right of the axes."""
+    positions = {row: index for index, row in enumerate(order)}
+    # The category axis puts one row every row_height_pt points, so the point
+    # inset converts into the data units the bracket ends are measured in.
+    inset = PVALUE_INSET_PT / row_height_pt
+    transform = ax.get_yaxis_transform()
+    inner_x = 1 + PVALUE_GAP_PT / plot_width_pt
+    outer_x = 1 + (PVALUE_GAP_PT + PVALUE_TICK_PT) / plot_width_pt
+    text_x = 1 + (PVALUE_GAP_PT + PVALUE_TICK_PT + PVALUE_TEXT_PT) / plot_width_pt
+    for first, second in pairs:
+        pvalue = pair_pvalue(frame, first, second)
+        significant = pvalue < PVALUE_ALPHA
+        color = PVALUE_SIGNIFICANT_COLOR if significant else PVALUE_NEUTRAL_COLOR
+        top, bottom = positions[first] + inset, positions[second] - inset
+        for row in (top, bottom):
+            ax.plot(
+                [inner_x, outer_x], [row, row],
+                transform=transform, color=color, linewidth=0.6, clip_on=False,
+            )
+        ax.plot(
+            [outer_x, outer_x], [top, bottom],
+            transform=transform, color=color, linewidth=0.6, clip_on=False,
+        )
+        ax.text(
+            text_x, (top + bottom) / 2, format_pvalue(pvalue),
+            transform=transform, ha="left", va="center",
+            color=color, fontsize=PVALUE_FONTSIZE * font_scale,
+            fontweight="bold" if significant else "normal", clip_on=False,
+        )
 
-    n_cats = len(all_cats)
-    fig_height = max(AX_HEIGHT, n_cats * 0.35)
-    fig, axes = plt.subplots(
-        1, 3, figsize=(3 * AX_WIDTH + 3, fig_height),
-        sharey=True, gridspec_kw={"width_ratios": [4, 4, 3]},
+
+def draw_stats_panel(
+    ax: Axes,
+    spec: FigureSpec,
+    row_axis: Axes,
+    columns: list[tuple[float, float]],
+    width_pt: float,
+) -> None:
+    """Draw the per-row sample sizes and medians as its own axes-less panel.
+
+    Each cell is placed at its own column edge, in points converted to axes
+    fractions, which is what keeps the table aligned in a proportional face.
+    The footnote that closes the panel sits one row pitch under the last row —
+    outside the copied row limits, which ``ax.text`` renders unclipped — and is
+    set in the light weight of the same face to read as a note, not a row.
+    """
+    fontsize = STATS_FONTSIZE * spec.font_scale
+    rows = build_stats_rows(spec)
+    aligns = STATS_ALIGN * len(spec.panels)
+    for index, cells in enumerate(rows):
+        for (left, right), align, cell in zip(columns, aligns, cells):
+            ax.text(
+                (right if align == "right" else left) / width_pt, index, cell,
+                ha=align, va="center", family=FONT_FAMILY,
+                fontsize=fontsize, fontweight="bold",
+            )
+    if spec.pvalue_note:
+        ax.text(
+            0, len(rows), spec.pvalue_note, ha="left", va="center",
+            family=FONT_FAMILY, fontsize=fontsize, fontweight="normal",
+        )
+    # Copy the categorical limits (including their inversion) so the text rows
+    # line up with the violins; this panel carries no axes of its own.
+    ax.set_xlim(0, 1)
+    ax.set_ylim(*row_axis.get_ylim())
+    ax.axis("off")
+
+
+def draw_group_legend(ax: Axes, spec: FigureSpec, colors: dict[str, str]) -> None:
+    """Draw the merged-category colour key for rows that are coloured by group."""
+    seen = list(dict.fromkeys(spec.row_groups[row] for row in spec.row_order))
+    handles = [
+        Patch(facecolor=colors[group], edgecolor="black", linewidth=0.4, label=group)
+        for group in seen
+    ]
+    ax.legend(handles=handles, frameon=False)
+    cns.take_legend_out(title="Merged category", ax=ax)
+    # take_legend_out anchors the legend above the axes top; multipanel reads
+    # that overhang as a top decoration of this panel and shifts its axes down,
+    # which would leave the two panels' rows unaligned. Level it with the axes
+    # top instead — the legend still hangs outside to the right.
+    ax.get_legend().set_bbox_to_anchor((1, 1.0))
+
+
+def scale_text(ax: Axes, scale: float) -> None:
+    """Scale every text artist cnsplots created on one axes, keeping it in proportion."""
+    if scale == 1.0:
+        return
+    for axis in ("x", "y"):
+        size = ax.get_xticklabels()[0].get_fontsize() if axis == "x" else ax.get_yticklabels()[0].get_fontsize()
+        ax.tick_params(axis=axis, which="both", labelsize=size * scale)
+    for label in (ax.xaxis.label, ax.yaxis.label):
+        label.set_fontsize(label.get_fontsize() * scale)
+    legend = ax.get_legend()
+    if legend is not None:
+        for text in (*legend.get_texts(), legend.get_title()):
+            text.set_fontsize(text.get_fontsize() * scale)
+
+
+def scale_panel_labels(fig: Figure, labels: list[str], scale: float) -> None:
+    """Scale multipanel's own A/B/C lettering, which lives outside the axes."""
+    if scale == 1.0:
+        return
+    for text in fig.findobj(match=Text):
+        if text.get_text() in labels:
+            text.set_fontsize(text.get_fontsize() * scale)
+
+
+def use_single_face() -> None:
+    """Set both figures in ``FONT_FAMILY`` — one face for every element.
+
+    cnsplots rewrites matplotlib's sans-serif list from its own settings each
+    time it builds a figure, so the face is set there rather than in rcParams.
+    At save time it also re-fonts any text holding a non-ASCII character to
+    DejaVu Sans — the em dash in the axis labels and the U+2212 minus signs in
+    the DR ticks are enough to trigger it — which would split a figure across
+    two faces, so that fallback is pointed at the figure font as well.
+    """
+    cns.settings.font_sans_serif = (FONT_FAMILY, "Helvetica", "DejaVu Sans")
+    cns._utils.apply_unicode_font = partial(cns.apply_unicode_font, font=FONT_FAMILY)
+
+
+def draw_figure(spec: FigureSpec, colors: dict[str, str], group_order: list[str]) -> None:
+    """Draw one cnsplots figure — violin panels plus the stats table — and save it."""
+    plot_height = spec.row_height_pt * len(spec.row_order)
+    label_width = max(len(row) for row in spec.row_order) * LABEL_CHAR_PT
+    # Panel C is sized by its own table: the columns are measured in the face the
+    # rows are drawn in, at this figure's text size. Leftovers here show up as a
+    # gap before the legend, which hangs off this panel's right edge.
+    columns, stats_width = stats_columns(spec)
+    stats_width += STATS_SLACK_PT
+    margin_right = PVALUE_MARGIN_PT if spec.pairs else MARGIN_RIGHT_PT
+    canvas_width = (
+        2 * (spec.plot_width_pt + PAD_LEFT_PT + label_width + margin_right)
+        + stats_width
+        + STATS_PAD_PT
+        + CANVAS_SLACK_PT
     )
 
-    dr_data = [dr_dict.get(c, [np.nan]) for c in all_cats]
-    horizontal_violin_box(all_cats, dr_data, axes[0], colors)
-    axes[0].set_title("Depletion\n(DIT-HAP)")
-    axes[0].set_xlabel("DR")
-
-    um_data = [um_dict.get(c, [np.nan]) for c in all_cats]
-    horizontal_violin_box(all_cats, um_data, axes[1], colors)
-    axes[1].set_title("Depletion\n(gRNA)")
-    axes[1].set_xlabel("um")
-
-    for row, cat in enumerate(all_cats):
-        dr_vals = dr_dict.get(cat, [])
-        um_vals = um_dict.get(cat, [])
-        dr_str = (
-            f"DR:  n={len(dr_vals):<4}, med={np.median(dr_vals):<6.3f}"
-            if dr_vals else
-            "DR:  n=   -, med=  -   "
+    mp = cns.multipanel(max_width=canvas_width)
+    axes = []
+    for index, panel in enumerate(spec.panels):
+        ax = mp.panel(
+            chr(ord("A") + index),
+            width=spec.plot_width_pt,
+            height=plot_height,
+            pad_left=PAD_LEFT_PT,
+            pad_top=PAD_TOP_PT,
+            margin_right=margin_right,
         )
-        um_str = (
-            f"um:  n={len(um_vals):<4}, med={np.median(um_vals):<6.3f}"
-            if um_vals else
-            "um:  n=   -, med=  -   "
+        cns.violinplot(
+            data=panel.frame,
+            x=VALUE_COL,
+            y=ROW_COL,
+            order=spec.row_order,
+            # hue is the row itself, never the merged category: cnsplots seaborn
+            # normalises each violin against the densest peak of its own hue
+            # group, so sharing a hue would shrink rows whose peak is lower.
+            # Group membership still drives the colours via the palette below.
+            hue=ROW_COL,
+            hue_order=spec.row_order,
+            palette=[colors[spec.row_groups[row]] for row in spec.row_order],
+            legend=False,
+            ax=ax,
         )
-        axes[2].text(0.05, row, f"{dr_str}  {um_str}", va="center", ha="left", fontweight="bold", family="monospace")
-    axes[2].set_ylim(-0.5, n_cats - 0.5)
-    axes[2].invert_yaxis()
-    axes[2].axis("off")
+        ax.set_xlabel(panel.xlabel)
+        ax.set_ylabel("")
+        ax.set_xlim(*VALUE_RANGE)
+        scale_text(ax, spec.font_scale)
+        if index:
+            ax.tick_params(labelleft=False)
+        axes.append(ax)
 
-    # Draw horizontal divider lines between revised groups
-    for b in boundaries:
-        y = b + 0.5
-        for ax in axes[:2]:
-            ax.axhline(y=y, color="gray", linewidth=0.8, linestyle="--")
+    # Shared row labels: seaborn places the categories at 0..n-1 on the group axis.
+    axes[0].set_yticks(range(len(spec.row_order)), labels=spec.row_order)
 
-    # P-value annotations between adjacent categories
-    if show_pvalues:
-        _draw_pvalue_annotations(all_cats, dr_dict, axes[0], n_cats)
-        _draw_pvalue_annotations(all_cats, um_dict, axes[1], n_cats)
+    for boundary in spec.boundaries:
+        for ax in axes:
+            ax.axhline(boundary, color="0.45", linewidth=0.6, linestyle=(0, (4, 2)), zorder=0)
 
-    plt.tight_layout()
+    for index, panel in enumerate(spec.panels):
+        if spec.pairs:
+            annotate_pairs(
+                axes[index], spec.row_order, panel.frame, spec.pairs,
+                spec.plot_width_pt, spec.row_height_pt, spec.font_scale,
+            )
+
+    # Sample sizes and medians live in their own trailing panel, so the tick
+    # labels stay one line and the rows can be packed more tightly. It carries a
+    # label like the others: an empty one would reserve no label height and
+    # multipanel would place this axes higher than the violin panels.
+    stats_ax = mp.panel(
+        chr(ord("A") + len(spec.panels)),
+        width=stats_width,
+        height=plot_height,
+        pad_left=STATS_PAD_PT,
+        pad_top=PAD_TOP_PT,
+        margin_right=MARGIN_RIGHT_PT,
+    )
+    draw_stats_panel(stats_ax, spec, axes[0], columns, stats_width)
+
+    if spec.show_legend:
+        draw_group_legend(stats_ax, spec, colors)
+        # After the legend exists, so its own text is zoomed with the rest.
+        scale_text(stats_ax, spec.font_scale)
+
+    scale_panel_labels(mp.fig, [chr(ord("A") + index) for index in range(len(spec.panels) + 1)], spec.font_scale)
+
+    output_path = spec.output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(output_path.with_suffix(".png"), dpi=300, bbox_inches="tight")
-    plt.savefig(output_path.with_suffix(".pdf"), bbox_inches="tight")
-    plt.close(fig)
+    for suffix in (".png", ".pdf"):
+        cns.savefig(output_path.with_suffix(suffix))
     logger.success(f"Saved: {output_path.with_suffix('.png')} and {output_path.with_suffix('.pdf')}")
-
-
-def _format_pvalue(pval: float) -> str:
-    """Format a p-value in scientific notation, e.g. ``p=1.2E-9``."""
-    mantissa, exponent = f"{pval:.1e}".split("e")
-    if mantissa.endswith(".0"):
-        mantissa = mantissa[:-2]
-    return f"p={mantissa}E{int(exponent)}"
-
-
-def _draw_pvalue_annotations(
-    cats: list[str],
-    data_dict: dict[str, list[float]],
-    ax: plt.Axes,
-    n_cats: int,
-) -> None:
-    """Draw Mann-Whitney U p-values between adjacent category pairs."""
-    xlim = ax.get_xlim()
-    x_bracket = xlim[1] + 0.02  # just right of the data area
-    for i in range(len(cats) - 1):
-        vals_a = [v for v in data_dict.get(cats[i], []) if not np.isnan(v)]
-        vals_b = [v for v in data_dict.get(cats[i + 1], []) if not np.isnan(v)]
-        if len(vals_a) < 2 or len(vals_b) < 2:
-            continue
-        _, pval = mannwhitneyu(vals_a, vals_b, alternative="two-sided")
-        bold = pval < 0.05
-        y = i + 0.5
-        # Vertical bracket connecting the two categories
-        ax.plot([x_bracket, x_bracket], [i, i + 1], color="black", linewidth=0.5, clip_on=False)
-        # Small horizontal ticks at each end
-        tick_w = 0.01
-        ax.plot([x_bracket, x_bracket + tick_w], [i, i], color="black", linewidth=0.5, clip_on=False)
-        ax.plot([x_bracket, x_bracket + tick_w], [i + 1, i + 1], color="black", linewidth=0.5, clip_on=False)
-        # P-value text to the right of the bracket (scientific notation)
-        pval_str = _format_pvalue(pval)
-        ax.text(
-            x_bracket + tick_w + 0.01, y, pval_str,
-            va="center", ha="left",
-            fontweight="bold" if bold else "normal",
-            color="red" if bold else "gray",
-            clip_on=False,
-        )
 
 
 # =============================================================================
@@ -370,57 +670,136 @@ def _draw_pvalue_annotations(
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description="Plot DR/um distribution by phenotype category")
+    parser = argparse.ArgumentParser(description="Plot DR/um distributions by phenotype category with cnsplots")
     parser.add_argument("--merged", type=Path, default=DEFAULT_MERGED, help=f"Merged categories xlsx (default: {DEFAULT_MERGED})")
     parser.add_argument("--dit-hap", type=Path, default=DEFAULT_DIT_HAP, help=f"DIT-HAP TSV (default: {DEFAULT_DIT_HAP})")
     parser.add_argument("--grna", type=Path, default=DEFAULT_GRNA, help=f"gRNA TSV (default: {DEFAULT_GRNA})")
-    parser.add_argument("--revisions", type=Path, default=DEFAULT_CONFIG, help=f"Category config JSON, order + revisions (default: {DEFAULT_CONFIG})")
+    parser.add_argument("--revisions", type=Path, default=DEFAULT_CONFIG, help=f"Category config JSON (default: {DEFAULT_CONFIG})")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR, help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})")
     parser.add_argument("--verbose", action="store_true", help="Enable DEBUG level logging")
     return parser.parse_args()
+
+
+def build_original_spec(
+    merged: pd.DataFrame,
+    dit_hap: pd.DataFrame,
+    grna: pd.DataFrame,
+    config: CategoryConfig,
+    output_dir: Path,
+) -> FigureSpec:
+    """Build the fine-grained Sub_category figure spec grouped by revised category."""
+    working = merged.rename(columns={SUB_CATEGORY_COL: ROW_COL}).assign(
+        **{GROUP_COL: lambda df: df[ROW_COL].map(lambda sub: config.revisions.get(sub, sub))}
+    )
+    panels = [
+        Panel(
+            frame=build_long_frame(working, dit_hap, "DR", row_col=ROW_COL, group_col=GROUP_COL),
+            xlabel="DR — DIT-HAP",
+            short_label="DR",
+        ),
+        Panel(
+            frame=build_long_frame(working, grna, "um", row_col=ROW_COL, group_col=GROUP_COL),
+            xlabel="um — gRNA",
+            short_label="um",
+        ),
+    ]
+    row_groups = working.drop_duplicates(ROW_COL).set_index(ROW_COL)[GROUP_COL].to_dict()
+    row_order, boundaries = build_sub_category_rows(
+        panels, config.sub_category_order, config.category_order, row_groups
+    )
+    return FigureSpec(
+        name="Sub_category",
+        row_order=row_order,
+        row_groups=row_groups,
+        panels=panels,
+        boundaries=boundaries,
+        pairs=[],
+        output_path=output_dir / "DR_um_distribution_original.png",
+        show_legend=True,
+        pvalue_note=None,
+        row_height_pt=ORIGINAL_ROW_HEIGHT_PT,
+        plot_width_pt=ORIGINAL_PLOT_WIDTH_PT,
+        font_scale=ORIGINAL_FONT_SCALE,
+    )
+
+
+def build_revised_spec(
+    merged: pd.DataFrame,
+    dit_hap: pd.DataFrame,
+    grna: pd.DataFrame,
+    config: CategoryConfig,
+    output_dir: Path,
+) -> FigureSpec:
+    """Build the merged Category figure spec with adjacent-pair p-value brackets."""
+    panels = [
+        Panel(
+            frame=build_long_frame(merged, dit_hap, "DR", row_col=CATEGORY_COL, group_col=CATEGORY_COL),
+            xlabel="DR — DIT-HAP",
+            short_label="DR",
+        ),
+        Panel(
+            frame=build_long_frame(merged, grna, "um", row_col=CATEGORY_COL, group_col=CATEGORY_COL),
+            xlabel="um — gRNA",
+            short_label="um",
+        ),
+    ]
+    present = set().union(*(set(panel.frame[ROW_COL]) for panel in panels))
+    row_order = [cat for cat in config.category_order if cat in present]
+    row_order += sorted(present - set(row_order))
+    return FigureSpec(
+        name="Merged Category",
+        row_order=row_order,
+        row_groups={cat: cat for cat in row_order},
+        panels=panels,
+        boundaries=[],
+        pairs=adjacent_pairs(row_order, panels),
+        output_path=output_dir / "DR_um_distribution_revised.png",
+        show_legend=False,
+        pvalue_note=PVALUE_NOTE,
+        row_height_pt=REVISED_ROW_HEIGHT_PT,
+        plot_width_pt=REVISED_PLOT_WIDTH_PT,
+        font_scale=1.0,
+    )
 
 
 def main() -> int:
     """Main orchestrator."""
     args = parse_args()
     setup_logger("DEBUG" if args.verbose else "INFO")
+    use_single_face()
 
-    logger.info("Loading merged categories…")
-    merged = load_merged(args.merged)
-    logger.info(f"  {len(merged)} genes, {merged['Category'].nunique()} categories")
+    try:
+        logger.info("Loading merged categories…")
+        merged = load_merged(args.merged)
+        logger.info(f"  {len(merged)} genes, {merged[CATEGORY_COL].nunique()} merged categories")
 
-    logger.info("Loading DIT-HAP…")
-    dit_hap = load_dit_hap(args.dit_hap)
-    logger.info(f"  {len(dit_hap)} genes with DR values")
+        logger.info("Loading DIT-HAP and gRNA…")
+        dit_hap = load_dit_hap(args.dit_hap)
+        grna = load_grna(args.grna)
+        logger.info(f"  {len(dit_hap)} genes with DR, {len(grna)} genes with um")
 
-    logger.info("Loading gRNA…")
-    grna = load_grna(args.grna)
-    logger.info(f"  {len(grna)} genes with um values")
+        config = load_category_config(args.revisions)
+        logger.info(f"  {len(config.revisions)} sub-category merges configured")
 
-    logger.info("Loading category config…")
-    config = load_category_config(args.revisions)
-    logger.info(f"  {len(config.revisions)} sub-categories revised, "
-                f"{len(config.sub_category_order)} sub-categories ordered, "
-                f"{len(config.category_order)} categories ordered")
+        specs = [
+            build_original_spec(merged, dit_hap, grna, config, args.output_dir),
+            build_revised_spec(merged, dit_hap, grna, config, args.output_dir),
+        ]
 
-    # Plot 1: original fine-grained categories (Sub_category)
-    logger.info("=== Plot 1: original (Sub_category) ===")
-    merged_orig = merged.copy()
-    merged_orig["Category"] = merged_orig["Sub_category"]
-    dr_dict = build_value_dict(merged_orig, dit_hap, "DR", config.sub_category_order)
-    um_dict = build_value_dict(merged_orig, grna, "um", config.sub_category_order)
-    logger.info(f"  {len(dr_dict)} DR categories, {len(um_dict)} um categories")
-    plot_combined(dr_dict, um_dict, args.output_dir / "DR_um_distribution_original.png",
-                  order=config.sub_category_order, revisions=config.revisions)
+        all_frames = [panel.frame for spec in specs for panel in spec.panels]
+        group_order = build_group_order(all_frames, config.category_order)
+        colors = build_group_colors(group_order)
+        logger.info(f"  {len(group_order)} merged categories: {', '.join(group_order)}")
 
-    # Plot 2: merged categories (Category column already has revised merges)
-    logger.info("=== Plot 2: revised (merged Category) ===")
-    logger.info(f"  {merged['Category'].nunique()} merged categories")
-    dr_dict_rev = build_value_dict(merged, dit_hap, "DR", config.category_order)
-    um_dict_rev = build_value_dict(merged, grna, "um", config.category_order)
-    logger.info(f"  {len(dr_dict_rev)} DR categories, {len(um_dict_rev)} um categories")
-    plot_combined(dr_dict_rev, um_dict_rev, args.output_dir / "DR_um_distribution_revised.png",
-                  order=config.category_order, show_pvalues=True)
+        for spec in specs:
+            logger.info(f"=== {spec.name} figure — {len(spec.row_order)} rows ===")
+            log_category_stats(spec.row_order, spec.panels)
+            if spec.pairs:
+                log_pvalues(spec.pairs, spec.panels)
+            draw_figure(spec, colors, group_order)
+    except Exception as error:
+        logger.exception(f"An unexpected error occurred: {error}")
+        return 1
 
     return 0
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-DR / um Distribution — Pure Phenotype Categories (CNSPlots Style)
-==================================================================
+DR / um Distribution — Pure Phenotype Categories
+==================================================
 
 ``cnsplots`` figure restricted to five *pure* phenotype categories — rows
 whose ``Sub_category`` is exactly one growth stage rather than a mixed
-description. It follows the revised figure of step 07: two horizontal violin
+description. It follows the revised figure of step 06: two horizontal violin
 panels (DIT-HAP ``DR`` and gRNA ``um``, both sign-flipped so more negative =
 more depleted) plus a table panel with sample size and median per row.
 
@@ -19,7 +19,7 @@ Rows, in draw order:
    ``Morphological classification == "WT"``
 
 Every adjacent pair is annotated with a two-sided Mann-Whitney U p-value
-(raw, no multiple-comparison correction — the same choice as steps 06/07).
+(raw, no multiple-comparison correction — the same choice as step 06).
 The bracket column, label format and row layout match the revised cnsplots
 figure. Colours come from the Cell journal qualitative palette: significant
 p-values (p < 0.05) in the palette terracotta and the rest in the palette
@@ -33,19 +33,19 @@ Input
 - ``data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx``
   (sheet ``All genes``) — ``Systematic ID``, ``Sub_category``, and
   ``Morphological classification``.
-- ``data/references/gene_level_fitting_statistics_minusDR.tsv``
+- ``data/raw/gene_level_fitting_statistics_minusDR.tsv``
   — ``Systematic ID`` and sign-flipped ``DR`` (negative = depleted).
-- ``data/references/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv``
+- ``data/raw/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv``
   — ``Systematic ID`` and ``um`` (negated on load).
 
 Output
 ------
-- ``results/DR_um_distribution_pure_cnsplots.{png,pdf}``
+- ``results/DR_um_distribution_pure.{png,pdf}``
 
 Usage
 -----
-    mamba run -n cnsplots python scripts/08_plot_dr_distribution_pure_cns.py
-    mamba run -n cnsplots python scripts/08_plot_dr_distribution_pure_cns.py --verbose
+    mamba run -n cnsplots python scripts/07_plot_dr_distribution_pure.py
+    mamba run -n cnsplots python scripts/07_plot_dr_distribution_pure.py --verbose
 
 Author:   Yusheng Yang (guidance) + Claude Code (implementation)
 Date:     2026-10-27
@@ -91,8 +91,8 @@ from pipeline_utils import load_dit_hap, load_grna, setup_logger
 FONT_FAMILY = "Arial"
 
 DEFAULT_MERGED = Path("data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx")
-DEFAULT_DIT_HAP = Path("data/references/gene_level_fitting_statistics_minusDR.tsv")
-DEFAULT_GRNA = Path("data/references/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv")
+DEFAULT_DIT_HAP = Path("data/raw/gene_level_fitting_statistics_minusDR.tsv")
+DEFAULT_GRNA = Path("data/raw/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv")
 DEFAULT_OUTPUT_DIR = Path("results")
 
 MERGED_SHEET = "All genes"
@@ -110,7 +110,7 @@ PALETTE = [mcolors.to_hex(tuple(color)) for color in cns.palettes("Cell")]
 PVALUE_SIGNIFICANT_COLOR = PALETTE[0]
 PVALUE_NEUTRAL_COLOR = PALETTE[9]
 
-# Panel geometry in points (1/72 inch), matching the revised figure of step 07.
+# Panel geometry in points (1/72 inch), matching the revised figure of step 06.
 ROW_HEIGHT_PT = 16.89
 PLOT_WIDTH_PT = 69.25
 PAD_LEFT_PT = 12
@@ -132,7 +132,7 @@ LABEL_CHAR_PT = 4.4
 PVALUE_MARGIN_PT = 60
 CANVAS_SLACK_PT = 190
 
-# Matches the sign-flipped range covered by both proxies (steps 06/07).
+# Matches the sign-flipped range covered by both proxies.
 VALUE_RANGE = (-2.2, 0.3)
 
 # P-value column: one column of brackets right of the axes, never staircased.
@@ -611,7 +611,7 @@ def build_spec(
         row_order=row_order,
         panels=panels,
         pairs=adjacent_pairs(row_order, panels),
-        output_path=output_dir / "DR_um_distribution_pure_cnsplots.png",
+        output_path=output_dir / "DR_um_distribution_pure.png",
         pvalue_note=PVALUE_NOTE,
         row_height_pt=ROW_HEIGHT_PT,
         plot_width_pt=PLOT_WIDTH_PT,
