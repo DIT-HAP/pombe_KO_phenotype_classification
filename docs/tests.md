@@ -17,7 +17,7 @@ mamba run -n bioinformatics python -m pytest tests/ -v
 - `tests/test_phenotype.py` — 2 tests (shared column names + phenotype formatting)
 - `tests/test_pipeline_utils.py` — 4 tests (shared helpers)
 
-The archived `01` integration test (17 tests) lives with its script in
+The archived `01_format_and_update_ids.py` integration test (17 tests) lives with its script in
 `tmp/01_format_and_update_ids/tests/`.
 
 The sections below document the classifier cases in detail; the merge-table

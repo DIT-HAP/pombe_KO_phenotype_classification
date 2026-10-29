@@ -3,7 +3,7 @@ Hayles 2013 Phenotype Formatting
 ================================
 
 Shared column names and text formatting for the Hayles phenotype table.
-`01b_format_hayles_phenotypes.py` writes the columns with these names,
+`01_format_hayles_phenotypes.py` writes the columns with these names,
 and the downstream classification scripts read them.
 
 Formatting rules match the original `01_format_and_update_ids.py` step:

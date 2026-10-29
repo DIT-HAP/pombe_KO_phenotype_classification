@@ -1,10 +1,11 @@
 # Kim 2010 vs Hayles 2013 deletion datasets: reconciliation and data-quality notes
 
-> **Archive note (2026-10-29).** This note describes the archived 01 union,
-> now in `tmp/01_format_and_update_ids/`. The live pipeline starts at
-> `01b_format_hayles_phenotypes.py` and does not build the union. The per-gene
-> facts below still apply. Columns named `Hayles2013_*` belong to the archived
-> 01 schema; the live 01b table calls the study call `Gene_dispensability`.
+> **Archive note (2026-10-29).** This note describes the archived
+> `01_format_and_update_ids.py` union, now in `tmp/01_format_and_update_ids/`.
+> The live pipeline starts at `01_format_hayles_phenotypes.py` and does not
+> build the union. The per-gene facts below still apply. Columns named
+> `Hayles2013_*` belong to the archived schema; the live `01` table calls the
+> study call `Gene_dispensability`.
 
 This note records the reconciliation behind the question: **why do some genes
 have a 2010 dispensability result but no 2013 result?** It is the analytical
@@ -63,7 +64,7 @@ The 2013 workbook also copies both columns (`Kim et al 2010 Deletion dataset`,
 study`. The copies match Kim's full table exactly for all 4,825 shared
 constructed genes. The final union keeps Kim's originals only — the two 2013
 copies are dropped — and the 2013 study call is written as
-`Hayles2013_Gene_dispensability` (the live 01b table calls it
+`Hayles2013_Gene_dispensability` (the live `01` table calls it
 `Gene_dispensability`).
 
 ### Reconciliation roles
@@ -80,7 +81,7 @@ The 71 Kim-only IDs are therefore not 71 "missing results": only the 11
 constructed strains have a 2010 V/E call. The other 60 are design candidates
 that were never constructed, so they never had a 2010 dispensability result.
 
-At the **gene level**, the archived `01` updates IDs before merging and folds
+At the **gene level**, the archived `01_format_and_update_ids.py` updates IDs before merging and folds
 `SPAC27D7.10c` into `SPAC27D7.09c` (PomBase treats `.10c` as a synonym of
 `.09c`). The union's `Presence == 2010_only` therefore has **10 rows**, not
 11; the `.10c` historical record is kept in the `.09c` row's
@@ -410,7 +411,7 @@ The most important pitfalls, all handled by the loader or recorded here:
     tokens), with the sentinel `none` → `NONE` and only three content
     differences: `.10c` is removed from the `SPAC27D7.09c`/`.11c` lists
     (annotation update), and `SPAC212.01c` carries the Kim paralog list of
-    the dropped `SPCC737.04` row (a likely copy-paste error). Both `01b` and
+    the dropped `SPCC737.04` row (a likely copy-paste error). Both `01` and
     the archived `01` therefore use Kim's `Paralog`, update its IDs/names,
     and drop `Paralogues`.
 

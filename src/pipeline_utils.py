@@ -43,7 +43,7 @@ from loguru import logger
 # GLOBAL CONSTANTS
 # =============================================================================
 
-# PomBase monthly release, shared by 00 (download) and 01b (ID mapping).
+# PomBase monthly release, shared by 00 (download) and 01 (ID mapping).
 DEFAULT_RELEASE = "2026-06-01"
 
 

@@ -1,12 +1,12 @@
-# 01b_format_hayles_phenotypes.py — Hayles 2013 表型表
+# 01_format_hayles_phenotypes.py — Hayles 2013 表型表
 
 当前流程的第一步。以 Hayles 2013 为主表构建基因级表型表。Kim 2010 只提供系统名和 Paralog 列。Kim 表型数据不合并。
 
 ## 流程位置
 
-`00 → 01b → 03 → 04 → 05 → {02, 06, 07}`
+`00 → 01 → 03 → 04 → 05 → {02, 06, 07}`
 
-`01b` 的输出 `Hayles2013_phenotypes_annotated.xlsx` 是 `03` 的输入。
+`01` 的输出 `Hayles2013_phenotypes_annotated.xlsx` 是 `03` 的输入。
 
 ## 逻辑
 
@@ -55,7 +55,7 @@
 ## 运行
 
 ```bash
-mamba run -n bioinformatics python scripts/01b_format_hayles_phenotypes.py
+mamba run -n bioinformatics python scripts/01_format_hayles_phenotypes.py
 ```
 
 ## 说明

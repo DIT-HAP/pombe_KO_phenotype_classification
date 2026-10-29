@@ -2,14 +2,14 @@
 Shared Kim 2010 / Hayles 2013 dataset merge
 ===========================================
 
-Library module used by ``01b_format_hayles_phenotypes.py`` for the source
+Library module used by ``01_format_hayles_phenotypes.py`` for the source
 loaders and duplicate-ID collapse, and by the archived
 ``01_format_and_update_ids.py`` for the union builder and Table S3 parsing.
 It loads the two source tables, canonicalises their column names, and builds
 a union table with:
 
-- one row per current systematic ID (01 updates IDs before calling this
-  module and uses ``collapse_duplicate_ids()`` for any collisions);
+- one row per current systematic ID (the caller updates IDs before calling
+  this module and uses ``collapse_duplicate_ids()`` for any collisions);
 - a ``Presence`` column: ``both``, ``2010_only``, ``2013_only`` or
   ``neither`` (data availability, not just ID membership);
 - a ``Dispensability_consistency`` column for genes present in both:

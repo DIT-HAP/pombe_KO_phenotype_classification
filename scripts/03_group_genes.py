@@ -27,7 +27,7 @@ curation.
 Input
 -----
 - ``data/1_formatted/Hayles2013_phenotypes_annotated.xlsx``
-  Formatted phenotype data (output of 01b_format_hayles_phenotypes.py).
+  Formatted phenotype data (output of 01_format_hayles_phenotypes.py).
 
 Output
 ------

@@ -63,7 +63,7 @@ pombe_KO_phenotype_classification/
 │   └── pipeline_utils.py       shared logging + DIT-HAP helpers
 └── scripts/
     ├── 00_download_pombase_annotation.py
-    ├── 01b_format_hayles_phenotypes.py  first phenotype step
+    ├── 01_format_hayles_phenotypes.py  first phenotype step
     ├── 02_keyword_profile.py
     ├── 03_group_genes.py
     ├── 04_categorize_phenotypes.py
@@ -81,7 +81,7 @@ union (via `src/dataset_merge.py`) with `Presence` (`both` / `2010_only` /
 `2013_only` / `neither`), `Dispensability_consistency`,
 `Dispensability_discrepancy` and `Dispensability_change_class`, plus
 `Gene product` (PomBase) and `Paralog`/`Paralog_gene_name` (Kim data, current
-IDs/names). The live pipeline starts at `01b_format_hayles_phenotypes.py`; it
+IDs/names). The live pipeline starts at `01_format_hayles_phenotypes.py`; it
 uses the same ID maps and Kim `Paralog`, but does not build the union. Key
 facts:
 
@@ -105,7 +105,7 @@ facts:
   present in the 2013 main table but not in Table S3.
 
 See `docs/kim2010_hayles2013_reconciliation.md` for the per-gene record and
-data-quality notes, and `docs/01b_format_hayles_phenotypes.md` for the live
+data-quality notes, and `docs/01_format_hayles_phenotypes.md` for the live
 phenotype-table specification. The old step 01 design note is archived with
 its project in `tmp/01_format_and_update_ids/docs/`.
 
@@ -114,7 +114,7 @@ its project in `tmp/01_format_and_update_ids/docs/`.
 Scripts run in this order:
 
 1. **00_download_pombase_annotation.py** — downloads the PomBase gene annotation
-2. **01b_format_hayles_phenotypes.py** — first phenotype step. Updates Kim and
+2. **01_format_hayles_phenotypes.py** — first phenotype step. Updates Kim and
    Hayles IDs through `src/id_mapping.py`, takes Kim's `Paralog` only, formats
    the Hayles phenotype text, and writes three tables: the Kim paralog
    pre-merge (`Kim2010_paralog_premerge.xlsx`), the Hayles pre-merge

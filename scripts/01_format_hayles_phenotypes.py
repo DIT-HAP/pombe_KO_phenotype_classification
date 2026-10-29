@@ -44,8 +44,8 @@ Output
 Usage
 -----
     cd <project root>
-    mamba run -n bioinformatics python scripts/01b_format_hayles_phenotypes.py
-    mamba run -n bioinformatics python scripts/01b_format_hayles_phenotypes.py --verbose
+    mamba run -n bioinformatics python scripts/01_format_hayles_phenotypes.py
+    mamba run -n bioinformatics python scripts/01_format_hayles_phenotypes.py --verbose
 
 Author:   Yusheng Yang (guidance) + Claude Code (implementation)
 Date:     2026-10-29

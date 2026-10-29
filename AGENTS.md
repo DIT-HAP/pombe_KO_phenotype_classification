@@ -22,9 +22,9 @@ DIT-HAP/gRNA depletion-rate validation.
   them.
 - Scripts are numbered, not auto-chained. Real dependency order:
 
-  `00 → 01b → 03 → 04 → 05 → {02, 06, 07}`
+  `00 → 01 → 03 → 04 → 05 → {02, 06, 07}`
 
-  `01b` is the first phenotype step. It updates the Kim and Hayles IDs through
+  `01` is the first phenotype step. It updates the Kim and Hayles IDs through
   `src/id_mapping.py`, takes Kim's `Paralog` only, and writes three files: the
   Kim paralog pre-merge (`Kim2010_paralog_premerge.xlsx`, 4,913 rows), the
   Hayles pre-merge (`Hayles2013_phenotypes_premerge.xlsx`, 4,843 rows) and the
@@ -69,16 +69,17 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
   `03`/`04` (`02` imports only its modifier groups).
 - `src/dataset_merge.py` — shared Kim 2010/Hayles 2013 loaders, the Table S3
   parser, `collapse_duplicate_ids()`, and `build_merged_dataset()`. Imported by
-  `01b` and the archived `01`. The union's `Presence` /
+  the live `01` and the archived `01_format_and_update_ids.py`. The union's `Presence` /
   `Dispensability_consistency` / `Dispensability_discrepancy` /
   `Dispensability_change_class` columns are defined here.
 - `src/id_mapping.py` — shared PomBase ID update: `read_pombase_annotation`,
   `collect_mapping_ids`, `update_sysids`, `build_paralog_columns`,
   `combine_mapping_notes`, plus `PomBaseCol`, `build_update_maps` and
-  `normalize_sysid`. Imported by `01b` and the archived `01`.
-- `src/phenotype.py` — canonical 01b column names (`Phenotype_description`,
+  `normalize_sysid`. Imported by the live `01` and the archived
+  `01_format_and_update_ids.py`.
+- `src/phenotype.py` — canonical 01 column names (`Phenotype_description`,
   `Morphological_classification`, `Gene_dispensability`) and
-  `format_hayles_phenotypes()`. Imported by `01b`, `02`, `03`, `04` and `07`.
+  `format_hayles_phenotypes()`. Imported by `01`, `02`, `03`, `04` and `07`.
 - `src/pipeline_utils.py` — shared `setup_logger`, `load_dit_hap`,
   `category_dr_medians`, and the `DEFAULT_RELEASE` constant.
 - `src/category_revisions.py` — shared loader for
@@ -109,21 +110,22 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
   `SPAC27D7.10c` folded into the `SPAC27D7.09c` row (the IDs are also listed
   in `README.md`); do not treat the 60 not-constructed candidates as
   missing results.
-- Both `01b` and the archived `01` update IDs before merging. `SPAC27D7.10c`
+- Both the live `01` and the archived `01_format_and_update_ids.py` update IDs
+  before merging. `SPAC27D7.10c`
   (the 2010-only ts remake) is a PomBase synonym of `SPAC27D7.09c`. In the
-  live `01b` Kim pre-merge the two rows collapse: `Kim_ID` =
+  live `01` Kim pre-merge the two rows collapse: `Kim_ID` =
   `SPAC27D7.09c; SPAC27D7.10c` and `Kim_Note` starts with `COLLAPSED`. In the
   archived 01 union, `Original Systematic ID` = `SPAC27D7.09c; SPAC27D7.10c`,
   `Presence` = `both`, and `note` starts with `COLLAPSED`. The raw
   strain-level reconciliation still has 11 absent strains; the union has 10
   `2010_only` rows. The 4,843-row Hayles table has unique current IDs.
-- The live `01b` table has 12 columns: `Systematic ID`, `Gene name`,
+- The live `01` table has 12 columns: `Systematic ID`, `Gene name`,
   `Gene product`, `Gene type`, `Hayles_ID`, `Kim_ID`, `Hayles_Note`,
   `Kim_Note`, `Phenotype_description`, `Morphological_classification`,
   `Gene_dispensability`, `Kim_Paralog`. `Gene name`/`Gene product`/`Gene type`
   come from PomBase; an empty `Gene name` falls back to `Systematic ID`.
   `Kim_Paralog` comes from Kim's `Paralog` with current IDs.
-  The archived `01` union has 25 columns and adds `Presence`,
+  The archived `01_format_and_update_ids.py` union has 25 columns and adds `Presence`,
   `Dispensability_consistency`/`_discrepancy`/`_change_class`, the three
   Hayles Table S3 columns, `Paralog`/`Paralog_gene_name`, the Kim 2010 calls,
   and the original IDs/names. That table is in
@@ -132,15 +134,16 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
   reference files are required inputs but are *not* in the repo. Missing files
   must be obtained separately:
   - `kim2010/kim2010_supp_table1.xls` (Kim 2010 full Supplementary Table 1;
-    `01b` and the archived `01`)
+    the live `01` and the archived `01_format_and_update_ids.py`)
   - `kim2010/kim2010_supp_table3.tsv` (Kim Table S3: 40 literature
     disagreements + judgment criteria; hand-transcribed because the table is
     only published in the supplementary PDF. Tracked via a `.gitignore`
-    exception, so it *is* in the repo. Used only by the archived `01`)
-  - `hayles2013/hayles2013_supp_table3.xlsx` (Hayles 2013 main table; `01b`
-    and the archived `01`)
+    exception, so it *is* in the repo. Used only by the archived
+    `01_format_and_update_ids.py`)
+  - `hayles2013/hayles2013_supp_table3.xlsx` (Hayles 2013 main table; the
+    live `01` and the archived `01_format_and_update_ids.py`)
   - `hayles2013/hayles2013_supp.docx` (Hayles Table S3; used only by the
-    archived `01` for the documented-change classes)
+    archived `01_format_and_update_ids.py` for the documented-change classes)
   - `pombase-2026-06-01_gene_IDs_names_products.tsv` (produced by `00`)
   The fitted DIT-HAP/gRNA parameters live in `data/raw/` (not gitignored):
   - `gene_level_fitting_statistics_minusDR.tsv` (sign-flipped DR; `04`/`05`/`06`/`07`)
@@ -152,7 +155,7 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
   - `data/references/previous_manual_check_of_insistent_phenotypes/Inconsistent_phenotypes_at_25_32_manual.xlsx`
   - `data/references/kim2010/kim2010_supp_table3.tsv` — hand-transcribed Kim
     Table S3 (40 published-vs-own disagreements, judgment criteria and the
-    four footnotes). The archived `01` validates its `published_data` /
+    four footnotes). The archived `01_format_and_update_ids.py` validates its `published_data` /
     `our_data` / `final_judgment` columns against Kim Table S1 at runtime.
   - `data/4_categorized_genes/category_revisions.json` — single source of truth for
     both figure draw orders and the `Sub_category → Category` merge used by
@@ -166,9 +169,9 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
 
 ## Docs
 
-Per-step design notes live in `docs/` (`00_`, `01b_`, `04_`, `05_`,
+Per-step design notes live in `docs/` (`00_`, `01_`, `04_`, `05_`,
 `growth_signals.md`, `tests.md`, `kim2010_hayles2013_reconciliation.md`).
-The reconciliation note describes the archived 01 union; the live pipeline
-starts at `01b`.
+The reconciliation note describes the archived `01_format_and_update_ids.py`
+union; the live pipeline starts at `01`.
 `README.md` has the paper context and concept glossary (`Sub_category` vs
 `Category` vs `Growth_tier`).
