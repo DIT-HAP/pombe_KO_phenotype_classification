@@ -7,8 +7,9 @@
 Downloads a specific monthly release of the PomBase gene annotation file
 (`gene_IDs_names_products.tsv`) and caches it locally. The cached file serves
 as the reference for the subsequent gene ID mapping step
-(`01_update_systematic_ids.py`), which maps legacy gene identifiers from the
-Hayles 2013 supplementary table to their current PomBase equivalents.
+(`01b_format_hayles_phenotypes.py`), which maps legacy gene identifiers from
+the Hayles 2013 supplementary table to their current PomBase equivalents
+through `src/id_mapping.py`.
 
 ---
 

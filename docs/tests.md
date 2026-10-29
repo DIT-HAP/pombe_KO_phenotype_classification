@@ -2,16 +2,26 @@
 
 ## Overview
 
-Three test files, 88 tests total, all passing:
+Seven test files, 117 tests total, all passing:
 
 ```
 mamba run -n bioinformatics python -m pytest tests/ -v
-88 passed in 0.20s
+117 passed in ~3s
 ```
 
 - `tests/test_growth_signals.py` — 36 tests (end-to-end classification)
 - `tests/test_classification.py` — 39 tests (Single/Multiple logic)
 - `tests/test_category_revisions.py` — 13 tests (category config loader)
+- `tests/test_dataset_merge.py` — 16 tests (loaders + raw 2010/2013 union + Kim Table S3)
+- `tests/test_id_mapping.py` — 7 tests (shared PomBase ID update, paralogs, notes)
+- `tests/test_phenotype.py` — 2 tests (shared column names + phenotype formatting)
+- `tests/test_pipeline_utils.py` — 4 tests (shared helpers)
+
+The archived `01` integration test (17 tests) lives with its script in
+`tmp/01_format_and_update_ids/tests/`.
+
+The sections below document the classifier cases in detail; the merge-table
+tests are summarised in their own section.
 
 ---
 
@@ -190,7 +200,7 @@ description has one or multiple parallel growth phenotypes.
 
 ## `tests/test_category_revisions.py` — category config loader (13 tests)
 
-Tests `load_category_config()` from `scripts/category_revisions.py`, the shared
+Tests `load_category_config()` from `src/category_revisions.py`, the shared
 loader for the category JSON (`sub_category_order` / `revisions` /
 `category_order`).
 
@@ -212,6 +222,51 @@ loader for the category JSON (`sub_category_order` / `revisions` /
 
 ---
 
+## `tests/test_dataset_merge.py` — loaders + 2010/2013 union table (16 tests)
+
+Loader/normalisation tests pin the input parsing; synthetic-frame tests cover
+every `Presence` value and the consistency/change-class logic; one real-data
+test checks the actual tables.
+
+| Test | What it pins down |
+|---|---|
+| `test_normalize_id_strips_all_whitespace` | whitespace removal and missing-value handling |
+| `test_normalize_call_maps_words_and_stray_spaces` | `viable`/`essential` and stray spaces → `V`/`E` |
+| `test_reconstruct_gene_name_from_date` | Excel date cells → `Oct-1`, `Sep-11`, `Sep-1` |
+| `test_parse_table_s3_repairs_truncated_id` | Table S3 `SPAC13D6.0` → `SPAC13D6.05` |
+| `test_merged_presence_column` | `both` / `2010_only` / `2013_only` / `neither` assignment |
+| `test_merged_consistency_column` | `consistent` when analysis == study; `inconsistent` otherwise; `not_comparable` for one-sided rows |
+| `test_merged_change_classes_and_discrepancy` | `no_change`, `documented_change`, `matches_kim2010_deletion_not_analysis`, `kim2010_deletion_analysis_discrepancy`, `hayles2013_addition`, `no_hayles2013_row`, `no_data_either`; discrepancy text and Table S3 comment |
+| `test_merged_gene_name_prefers_2013_then_falls_back_to_2010` | canonical `Gene name` selection |
+| `test_merged_keeps_source_columns` | 2010 columns survive under `Kim2010_*` |
+| `test_merged_without_table_s3_marks_changed_rows_accordingly` | graceful degradation to `changed_table_s3_not_available` |
+| `test_real_inputs_build_expected_union` | raw merge before 01's ID collapse: 4,914 rows; 4,836 constructed; 4,843 Hayles rows; the three repaired Excel-date names; presence 4,825 / 18 / 11 / 60; consistency 4,796 / 29 / 89; change-class counts (Table S3 counts only when the docx is present) |
+| `test_kim_table_s3_matches_table_s1` | the 40-row Kim Table S3 TSV: numbering, calls, criteria counts and footnote rows match Table S1 |
+| `test_kim_table_s3_validation_rejects_transcription_errors` | a dropped row, a non-disagreement ID, criteria drift and a moved footnote all raise |
+
+---
+
+## `tests/test_id_mapping.py` — shared ID update (7 tests)
+
+| Test | What it pins down |
+|---|---|
+| `test_normalize_sysid_case_and_suffix` | case normalisation; `SPAC1556.06.1` → `SPAC1556.06`; non-strings pass through |
+| `test_build_update_maps_layers` | protein-coding filter; name → ID and synonym → ID maps |
+| `test_update_sysids_all_layers` | direct match, name update, synonym update, reclassification, not found |
+| `test_collect_mapping_ids_deduplicates_main_and_paralog` | main IDs, Hayles IDs and Kim paralogs are unique and keep first-seen order |
+| `test_build_paralog_columns_updates_and_drops_self` | current IDs, current names, self-reference removal, `being curated` |
+| `test_combine_mapping_notes_single_and_collapsed` | single note and the `COLLAPSED: ...` format |
+| `test_read_pombase_annotation_strips_whitespace` | TSV loading and whitespace stripping |
+
+## `tests/test_phenotype.py` — shared formatting (2 tests)
+
+| Test | What it pins down |
+|---|---|
+| `test_column_names` | `Phenotype_description`, `Morphological_classification`, `Gene_dispensability` |
+| `test_format_hayles_phenotypes_normalises_text` | whitespace, trailing periods, and `25, 32` / `25 32` / `32, 25` → `25,32` |
+
+---
+
 ## Running the tests
 
 ```bash
@@ -226,6 +281,15 @@ mamba run -n bioinformatics python -m pytest tests/test_classification.py -v
 
 # Revision mapping loader only
 mamba run -n bioinformatics python -m pytest tests/test_category_revisions.py -v
+
+# 2010/2013 union table only
+mamba run -n bioinformatics python -m pytest tests/test_dataset_merge.py -v
+
+# Shared ID mapping only
+mamba run -n bioinformatics python -m pytest tests/test_id_mapping.py -v
+
+# Shared phenotype formatting only
+mamba run -n bioinformatics python -m pytest tests/test_phenotype.py -v
 
 # Stop on first failure
 mamba run -n bioinformatics python -m pytest tests/ -x

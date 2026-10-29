@@ -40,7 +40,7 @@ pombe_KO_phenotype_classification/
 │   │   ├── kim2010/         Kim 2010 PDFs + supplementary tables
 │   │   ├── hayles2013/      Hayles 2013 PDFs + supplementary tables
 │   │   └── previous_manual_check_.../ (hand-curated)
-│   ├── 1_formatted/        ID-updated per-source tables, 2013 subset + 2010/2013 union
+│   ├── 1_formatted/        Hayles phenotype table + Kim paralog pre-merge
 │   ├── 2_keyword_profile/  keyword-level analysis per Growth_tier
 │   ├── 3_grouped_genes/    grouped by phenotype consistency
 │   ├── 4_categorized_genes/ categorized phenotypes, inspection pivots
@@ -54,29 +54,36 @@ pombe_KO_phenotype_classification/
 │   ├── DR_um_distribution_revised.pdf
 │   ├── DR_um_distribution_pure.png
 │   └── DR_um_distribution_pure.pdf
+├── src/
+│   ├── growth_signals.py       shared signal-detection engine
+│   ├── id_mapping.py           shared PomBase ID update
+│   ├── phenotype.py            shared phenotype column names + formatting
+│   ├── dataset_merge.py        shared 2010/2013 loaders + union merge
+│   ├── category_revisions.py   shared category order + merge mapping
+│   └── pipeline_utils.py       shared logging + DIT-HAP helpers
 └── scripts/
     ├── 00_download_pombase_annotation.py
-    ├── 01_format_and_update_ids.py
+    ├── 01b_format_hayles_phenotypes.py  first phenotype step
     ├── 02_keyword_profile.py
     ├── 03_group_genes.py
     ├── 04_categorize_phenotypes.py
     ├── 05_merge_categories.py
     ├── 06_plot_dr_distribution.py       DR/um distribution (violin + stats)
     ├── 07_plot_dr_distribution_pure.py  five pure-category figure
-    ├── growth_signals.py             shared signal-detection engine
-    ├── category_revisions.py         shared category order + merge mapping
-    ├── dataset_merge.py              shared 2010/2013 loaders + union merge
     └── arc/                          deprecated previous implementation
 ```
 
 ## Kim 2010 vs Hayles 2013 reconciliation
 
-`01_format_and_update_ids.py` updates IDs/names in both tables **before**
-building a 4,913-row gene-level union (via `scripts/dataset_merge.py`) with
-`Presence` (`both` / `2010_only` / `2013_only` / `neither`),
-`Dispensability_consistency`, `Dispensability_discrepancy` and
-`Dispensability_change_class`, plus `Gene product` (PomBase) and
-`Paralog`/`Paralog_gene_name` (Kim data, current IDs/names). Key facts:
+The archived `01_format_and_update_ids.py` (in `tmp/01_format_and_update_ids/`)
+updated IDs/names in both tables **before** building a 4,913-row gene-level
+union (via `src/dataset_merge.py`) with `Presence` (`both` / `2010_only` /
+`2013_only` / `neither`), `Dispensability_consistency`,
+`Dispensability_discrepancy` and `Dispensability_change_class`, plus
+`Gene product` (PomBase) and `Paralog`/`Paralog_gene_name` (Kim data, current
+IDs/names). The live pipeline starts at `01b_format_hayles_phenotypes.py`; it
+uses the same ID maps and Kim `Paralog`, but does not build the union. Key
+facts:
 
 - The 2010 `.xls` is the **full Supplementary Table 1**: 4,914 candidate
   genes, of which 4,836 were constructed.
@@ -98,25 +105,21 @@ building a 4,913-row gene-level union (via `scripts/dataset_merge.py`) with
   present in the 2013 main table but not in Table S3.
 
 See `docs/kim2010_hayles2013_reconciliation.md` for the per-gene record and
-data-quality notes, and `docs/01_update_systematic_ids.md` for the
-merge/output specification.
+data-quality notes, and `docs/01b_format_hayles_phenotypes.md` for the live
+phenotype-table specification. The old step 01 design note is archived with
+its project in `tmp/01_format_and_update_ids/docs/`.
 
 ## Pipeline
 
 Scripts run in this order:
 
 1. **00_download_pombase_annotation.py** — downloads the PomBase gene annotation
-2. **01_format_and_update_ids.py** — updates IDs and gene names in both source
-   tables before merging, builds the gene-level union with
-   presence/dispensability comparison columns, adds `Gene product` (PomBase),
-   `Paralog`/`Paralog_gene_name` (Kim data), and the Hayles Table S3
-   strain-status / 2010-change annotations, then formats the phenotypes.
-   Writes the ID-updated per-source tables
-   (`Kim2010_premerge_formatted.xlsx`, `Hayles2013_premerge_formatted.xlsx`),
-   the union, and the 4,843-row Hayles subset that feeds step 03. The Kim
-   intermediate records the published-vs-own comparison and the 40 Kim
-   Table S3 judgment criteria; the Hayles intermediate records the
-   2013-vs-Kim verdict.
+2. **01b_format_hayles_phenotypes.py** — first phenotype step. Updates Kim and
+   Hayles IDs through `src/id_mapping.py`, takes Kim's `Paralog` only, formats
+   the Hayles phenotype text, and writes three tables: the Kim paralog
+   pre-merge (`Kim2010_paralog_premerge.xlsx`), the Hayles pre-merge
+   (`Hayles2013_phenotypes_premerge.xlsx`), and the 4,843-row
+   `Hayles2013_phenotypes_annotated.xlsx` that feeds step 03.
 3. **03_group_genes.py** — groups genes by phenotype consistency at different temperatures
 4. **04_categorize_phenotypes.py** — categorises growth phenotypes using signal-based detection;
    re-ranks Growth_tier by sign-flipped DIT-HAP DR median (most depleted = tier 1)
@@ -145,9 +148,9 @@ Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx` and
 
 ## Test suite
 
-125 tests covering signal detection, modifier handling, segment filtering,
-Single/Multiple classification, the Kim-2010/Hayles-2013 union, and the
-per-source ID-update intermediates:
+117 tests covering signal detection, modifier handling, segment filtering,
+Single/Multiple classification, the Kim-2010/Hayles-2013 loaders, and the
+shared ID-mapping and phenotype-formatting modules:
 
 ```bash
 mamba run -n bioinformatics python -m pytest tests/ -v

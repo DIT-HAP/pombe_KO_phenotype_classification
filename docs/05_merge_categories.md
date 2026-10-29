@@ -25,7 +25,7 @@ data/4_categorized_genes/                Hand-curated category config
   category_revisions.json                (sub-category order, merges,
                                          category order; shared with step 06)
                              ↓
-data/references/                         Sign-flipped DIT-HAP DR for tier ranking
+data/raw/                                Sign-flipped DIT-HAP DR for tier ranking
   gene_level_fitting_statistics_
   minusDR.tsv
                              ↓
@@ -47,7 +47,7 @@ results/                                 Copy for source control
    `Sub_category`, then map it through `category_revisions.json`
    (`Sub_category → Category`). Sub-categories not listed in the JSON keep
    themselves as their merged `Category`. The mapping is loaded by the shared
-   `scripts/category_revisions.py` helper.
+   `src/category_revisions.py` helper.
 3. **Re-rank Growth_tier** — compute the median DIT-HAP DR per merged
    `Category`, rank from most depleted (tier 1) to least depleted (tier N).
    DR is sign-flipped (more negative = more depleted), so tier 1 has the

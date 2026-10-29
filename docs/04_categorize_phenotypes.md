@@ -28,7 +28,7 @@ data/references/                         Manual annotations for the
   Inconsistent_phenotypes_at_25_32_
   manual.xlsx
                              ↓
-data/references/                         Sign-flipped DIT-HAP DR for tier ranking
+data/raw/                                Sign-flipped DIT-HAP DR for tier ranking
   gene_level_fitting_statistics_
   minusDR.tsv
                              ↓
