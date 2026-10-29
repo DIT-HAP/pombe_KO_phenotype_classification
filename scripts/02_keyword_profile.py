@@ -287,7 +287,6 @@ def _classify_word(word: str) -> str:
     return "Other"
 
 
-@logger.catch
 def build_term_table(
     term_counts: dict[int, Counter],
     term_category: str | None = None,

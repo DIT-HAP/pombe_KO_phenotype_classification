@@ -101,7 +101,6 @@ setup_logger()
 # =============================================================================
 
 
-@logger.catch
 def identify_consistency_groups(df: pd.DataFrame) -> dict[str, np.ndarray]:
     """Return boolean masks for the three consistency groups.
 
@@ -119,7 +118,6 @@ def identify_consistency_groups(df: pd.DataFrame) -> dict[str, np.ndarray]:
     return {"both": both.values, "only_32": only_32.values, "inconsistent": inconsistent.values}
 
 
-@logger.catch
 def split_basic_additional(desc_series: pd.Series, marker: str) -> pd.DataFrame:
     """Split a phenotype description at *marker* into basic and additional parts.
 
@@ -134,7 +132,6 @@ def split_basic_additional(desc_series: pd.Series, marker: str) -> pd.DataFrame:
     return pd.DataFrame({"Basic phenotype": basic, "Additional phenotype": additional})
 
 
-@logger.catch
 def classify_phenotype_count(phenotype: object) -> str | float:
     """Classify as ``Single`` or ``Multiple``, or NaN for non‑string input.
 

@@ -209,7 +209,6 @@ class MergeResult:
 # =============================================================================
 
 
-@logger.catch
 def load_sources(
     config: MergeConfig,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -220,7 +219,6 @@ def load_sources(
     return kim, hayles, annotation
 
 
-@logger.catch
 def map_systematic_ids(
     kim: pd.DataFrame,
     hayles: pd.DataFrame,
@@ -241,7 +239,6 @@ def map_systematic_ids(
     return kim, hayles, id_map, note_map
 
 
-@logger.catch
 def prepare_kim(
     kim: pd.DataFrame,
     id_map: dict[str, str],
@@ -268,7 +265,6 @@ def prepare_kim(
     return kim
 
 
-@logger.catch
 def prepare_hayles(
     hayles: pd.DataFrame,
     note_map: dict[str, str],
@@ -285,7 +281,6 @@ def prepare_hayles(
     return hayles
 
 
-@logger.catch
 def build_kim_premerge(kim: pd.DataFrame) -> pd.DataFrame:
     """Kim's updated ID, original ID, note, and processed Paralog columns."""
     return kim[
@@ -301,7 +296,6 @@ def build_kim_premerge(kim: pd.DataFrame) -> pd.DataFrame:
     ]
 
 
-@logger.catch
 def build_hayles_premerge(hayles: pd.DataFrame) -> pd.DataFrame:
     """Hayles' updated ID, original ID, note, and four renamed columns."""
     return hayles[
@@ -323,7 +317,6 @@ def build_hayles_premerge(hayles: pd.DataFrame) -> pd.DataFrame:
     )[list(HAYLES_PREMERGE_COLUMNS)]
 
 
-@logger.catch
 def merge_tables(
     hayles_premerge: pd.DataFrame,
     kim_premerge: pd.DataFrame,
@@ -342,7 +335,6 @@ def merge_tables(
     return merged
 
 
-@logger.catch
 def add_annotation(merged: pd.DataFrame, annotation: pd.DataFrame) -> pd.DataFrame:
     """Add current PomBase gene name, product, and type by updated systematic ID."""
     by_id = annotation.drop_duplicates("gene_systematic_id").set_index(
@@ -384,7 +376,6 @@ def add_annotation(merged: pd.DataFrame, annotation: pd.DataFrame) -> pd.DataFra
     return annotated
 
 
-@logger.catch
 def build_phenotype_table(config: MergeConfig) -> MergeResult:
     """Load, map, prepare both sources, merge, and annotate."""
     kim, hayles, annotation = load_sources(config)

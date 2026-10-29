@@ -88,21 +88,18 @@ setup_logger()
 # =============================================================================
 
 
-@logger.catch
 def build_url(release: str) -> str:
     """Build the full PomBase download URL for the given release version."""
     year = release[:4]
     return POMBASE_URL_TEMPLATE.format(year=year, release=release)
 
 
-@logger.catch
 def build_output_path(outdir: Path, release: str) -> Path:
     """Build the local cache file path from release version."""
     filename = f"pombase-{release}_gene_IDs_names_products.tsv"
     return outdir / filename
 
 
-@logger.catch
 def download_file(url: str, dst: Path) -> int:
     """Download a file from *url* to *dst*; returns bytes downloaded."""
     logger.info(f"Downloading from: {url}")
@@ -124,7 +121,6 @@ def download_file(url: str, dst: Path) -> int:
     return len(content)
 
 
-@logger.catch
 def inspect_file(path: Path) -> dict:
     """Print file statistics; returns metadata dict for downstream use."""
     if not path.exists():

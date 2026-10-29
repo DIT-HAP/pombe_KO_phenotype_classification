@@ -72,7 +72,6 @@ DEFAULT_GENE_FILTER = f"{PomBaseCol.GENE_TYPE} == 'protein coding gene'"
 # =============================================================================
 
 
-@logger.catch
 def read_pombase_annotation(path: Path) -> pd.DataFrame:
     """Load and preprocess the PomBase annotation TSV."""
     logger.info(f"Loading PomBase annotation: {path}")
@@ -92,7 +91,6 @@ def read_pombase_annotation(path: Path) -> pd.DataFrame:
     return df
 
 
-@logger.catch
 def build_update_maps(
     annotation: pd.DataFrame,
     gene_filter: str = DEFAULT_GENE_FILTER,
@@ -145,7 +143,6 @@ def build_update_maps(
 # =============================================================================
 
 
-@logger.catch
 def normalize_sysid(gene: Any) -> str | Any:
     """Normalise a systematic ID to consistent case (e.g. SPAC1002.01c)."""
     if not isinstance(gene, str):
@@ -157,7 +154,6 @@ def normalize_sysid(gene: Any) -> str | Any:
     return gene
 
 
-@logger.catch
 def update_sysids(
     genes: list[Any],
     annotation: pd.DataFrame,
@@ -264,7 +260,6 @@ def update_sysids(
 # =============================================================================
 
 
-@logger.catch
 def collect_mapping_ids(
     kim2010: pd.DataFrame,
     hayles2013: pd.DataFrame,
@@ -314,7 +309,6 @@ def build_gene_name_map(annotation: pd.DataFrame) -> dict[str, str]:
     return name_map
 
 
-@logger.catch
 def build_paralog_columns(
     raw_paralogs: pd.Series,
     main_ids: pd.Series,
