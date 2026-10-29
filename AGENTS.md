@@ -17,9 +17,17 @@ DIT-HAP/gRNA depletion-rate validation.
 
 ## Running scripts
 
+- `./run_pipeline.sh` is the pipeline entry point. It runs the steps in
+  dependency order (not numeric order), always `cd`s to the repo root, uses
+  `bioinformatics` for 00–05 and `cnsplots` for 06–07, and passes every path
+  explicitly. `--list` and `--dry-run` show the steps and commands;
+  `--from`/`--to`/`--only`/`--skip` select a subset; `--release` couples 00
+  and 01. Override `MAMBA_BIN`, `BIO_ENV`, or `PLOT_ENV` if needed. Selections
+  do not run prerequisites automatically; each step's inputs are checked
+  first.
 - **Always run from the repo root.** All scripts use hardcoded relative paths
   (`data/...`, `results/...`) as argparse defaults; running from `scripts/` breaks
-  them.
+  them. `run_pipeline.sh` handles this by `cd`ing to its own directory.
 - Scripts are numbered, not auto-chained. Real dependency order:
 
   `00 → 01 → 03 → 04 → 05 → {02, 06, 07}`
@@ -47,11 +55,12 @@ DIT-HAP/gRNA depletion-rate validation.
 ## Testing
 
 ```bash
-mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (118 tests, ~3s)
+mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (126 tests, ~3s)
 mamba run -n bioinformatics python -m pytest tests/test_growth_signals.py -v
 mamba run -n bioinformatics python -m pytest tests/test_classification.py -v
 mamba run -n bioinformatics python -m pytest tests/test_dataset_merge.py -v
 mamba run -n bioinformatics python -m pytest tests/test_id_mapping.py -v
+mamba run -n bioinformatics python -m pytest tests/test_run_pipeline.py -v
 mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
 ```
 

@@ -31,6 +31,7 @@ Open Biology websites.
 ```
 pombe_KO_phenotype_classification/
 ├── README.md
+├── run_pipeline.sh         runs all steps in dependency order
 ├── .gitignore              ignores tmp/, references/, etc. (data/ is tracked)
 ├── data/
 │   ├── raw/                read-only. fitted DIT-HAP/gRNA parameters.
@@ -110,6 +111,29 @@ phenotype-table specification. The old step 01 design note is archived with
 its project in `tmp/01_format_and_update_ids/docs/`.
 
 ## Pipeline
+
+Run the whole chain with:
+
+```bash
+./run_pipeline.sh
+```
+
+The runner executes the steps in dependency order (not numeric order), always
+`cd`s to the repository root, and uses the `bioinformatics` env for 00–05 and
+`cnsplots` for 06–07. It passes every path explicitly, so its `--dry-run`
+output is the reference for each step's parameters.
+
+Useful options:
+
+- `--list` — print the step table
+- `--dry-run` — print every command without running it
+- `--from 04`, `--to 05`, `--only 05,06`, `--skip 06,07` — run a subset
+- `--release YYYY-MM-DD` — PomBase release, used consistently by 00 and 01
+- `--force` — re-download the PomBase annotation in step 00
+- `--verbose` — pass `--verbose` to every step
+
+Subsets do not run prerequisites automatically: each selected step checks its
+inputs first and names the step that produces any missing file.
 
 Scripts run in this order:
 
