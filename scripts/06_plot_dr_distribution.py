@@ -108,7 +108,13 @@ from matplotlib.text import Text
 from matplotlib.textpath import TextPath
 from scipy.stats import mannwhitneyu
 
-# 4. Local Imports
+# 4. Project Path Setup
+SCRIPT_DIR = Path(__file__).resolve().parent
+SRC_DIR = SCRIPT_DIR.parent / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+# 5. Local Imports
 from category_revisions import DEFAULT_CONFIG, CategoryConfig, load_category_config
 from pipeline_utils import load_dit_hap, load_grna, setup_logger
 

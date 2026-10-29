@@ -26,8 +26,8 @@ curation.
 
 Input
 -----
-- ``data/1_formatted/Hayles_2013_OB_formatted_phenotypes.xlsx``
-  Formatted phenotype data (output of 01_format_and_update_ids.py).
+- ``data/1_formatted/Hayles2013_phenotypes_annotated.xlsx``
+  Formatted phenotype data (output of 01b_format_hayles_phenotypes.py).
 
 Output
 ------
@@ -67,15 +67,22 @@ import pandas as pd
 # 3. Third-party Imports
 from loguru import logger
 
-# 4. Project Imports
+# 4. Project Path Setup
+SCRIPT_DIR = Path(__file__).resolve().parent
+SRC_DIR = SCRIPT_DIR.parent / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+# 5. Project Imports
 from growth_signals import count_growth_segments
+from phenotype import PHENOTYPE_DESC_COL
 from pipeline_utils import setup_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS
 # =============================================================================
 
-DEFAULT_INPUT = Path("data/1_formatted/Hayles_2013_OB_formatted_phenotypes.xlsx")
+DEFAULT_INPUT = Path("data/1_formatted/Hayles2013_phenotypes_annotated.xlsx")
 DEFAULT_OUTPUT = Path("data/3_grouped_genes/Hayles_2013_OB_grouped_genes.xlsx")
 
 # Temperature marker used to detect consistency in phenotype descriptions
@@ -103,7 +110,7 @@ def identify_consistency_groups(df: pd.DataFrame) -> dict[str, np.ndarray]:
     dict with keys 'both', 'only_32', 'inconsistent', each a boolean array
     of length ``len(df)``.
     """
-    desc = df["Deletion mutant phenotype description"]
+    desc = df[PHENOTYPE_DESC_COL]
 
     both = desc.str.contains(TEMP_BOTH, na=False)
     only_32 = desc.str.contains(TEMP_32, na=False) & (~desc.str.contains("25", na=False))
@@ -198,7 +205,7 @@ def main() -> int:
     # ------------------------------------------------------------------
     # 3. Split phenotype descriptions
     # ------------------------------------------------------------------
-    desc_col = "Deletion mutant phenotype description"
+    desc_col = PHENOTYPE_DESC_COL
 
     # Consistent at both temperatures — split on "25,32"
     both_idx = df[groups["both"]].index

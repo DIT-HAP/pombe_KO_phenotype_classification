@@ -61,15 +61,20 @@ import pandas as pd
 # 3. Third-party Imports
 from loguru import logger
 
-# 3b. Local modules
-from dataset_merge import HAYLES_STUDY_COL
+# 4. Project Path Setup
+SCRIPT_DIR = Path(__file__).resolve().parent
+SRC_DIR = SCRIPT_DIR.parent / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+# 5. Local modules
 from growth_signals import GROWTH_SIGNALS, classify_growth
-from pipeline_utils import (
-    CLASSIFICATION_COL,
-    category_dr_medians,
-    load_dit_hap,
-    setup_logger,
+from phenotype import (
+    DISPENSABILITY_COL,
+    MORPHOLOGY_COL,
+    PHENOTYPE_DESC_COL,
 )
+from pipeline_utils import category_dr_medians, load_dit_hap, setup_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -87,6 +92,8 @@ DEFAULT_OUTPUT = Path(
 DEFAULT_DIT_HAP = Path(
     "data/raw/gene_level_fitting_statistics_minusDR.tsv"
 )
+
+DESC_COL = PHENOTYPE_DESC_COL
 
 # Reverse lookup: known category name → growth tier.
 # Derived from the canonical signal table; fallback to tier 5 (WT).
@@ -266,16 +273,16 @@ def main() -> int:
         ("Inconsistent phenotypes", inconsistent),
     ]:
         pivots[f"Phenotypes pivot ({label})"] = build_pivot(
-            df, "Deletion mutant phenotype description", "Category"
+            df, DESC_COL, "Category"
         )
         pivots[f"Essentiality pivot ({label})"] = build_pivot(
-            df, HAYLES_STUDY_COL, "Category"
+            df, DISPENSABILITY_COL, "Category"
         )
         pivots[f"Classification pivot ({label})"] = build_pivot(
-            df, CLASSIFICATION_COL, "Category"
+            df, MORPHOLOGY_COL, "Category"
         )
         pivots[f"Growth_tier pivot ({label})"] = build_pivot(
-            df, CLASSIFICATION_COL, "Growth_tier"
+            df, MORPHOLOGY_COL, "Growth_tier"
         )
 
     # Also build a combined "All genes" pivot for the full description
@@ -291,7 +298,7 @@ def main() -> int:
     multi = all_genes.iloc[n_one:n_one + n_multi].copy()
     inconsistent = all_genes.iloc[n_one + n_multi:].copy()
     pivots["Phenotypes pivot (All genes)"] = build_pivot(
-        all_genes, "Deletion mutant phenotype description", "Category"
+        all_genes, DESC_COL, "Category"
     )
 
     # ------------------------------------------------------------------
@@ -306,7 +313,7 @@ def main() -> int:
     grouped = (
         all_genes
         .groupby([
-            "Deletion mutant phenotype description",
+            DESC_COL,
             "Growth_tier",
             "Category",
             "Phenotype_count",
@@ -319,7 +326,7 @@ def main() -> int:
 
     # Pivot with four-level column index
     multi_pivot = grouped.pivot_table(
-        index="Deletion mutant phenotype description",
+        index=DESC_COL,
         columns=["Growth_tier", "Category", "Phenotype_count", "Consistency_25_32"],
         values="Count",
         fill_value=0,
@@ -349,7 +356,7 @@ def main() -> int:
     logger.info("Building flat inspection table…")
     flat_full = all_genes[
         [
-            "Deletion mutant phenotype description",
+            DESC_COL,
             "Category",
             "Phenotype_count",
             "Growth_tier",
@@ -361,7 +368,7 @@ def main() -> int:
     gene_counts = (
         flat_full.groupby(
             [
-                "Deletion mutant phenotype description",
+                DESC_COL,
                 "Category",
                 "Phenotype_count",
                 "Growth_tier",
@@ -375,7 +382,7 @@ def main() -> int:
 
     flat_inspection = gene_counts.rename(
         columns={
-            "Deletion mutant phenotype description": "Phenotype description",
+            DESC_COL: "Phenotype description",
             "Phenotype_count": "Single/Multiple/Temp_mismatch",
         }
     )

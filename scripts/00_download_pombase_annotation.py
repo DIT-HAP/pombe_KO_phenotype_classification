@@ -53,7 +53,13 @@ from urllib.request import urlopen
 # 2. Third-party Imports
 from loguru import logger
 
-# 3. Local Imports
+# 3. Project Path Setup
+SCRIPT_DIR = Path(__file__).resolve().parent
+SRC_DIR = SCRIPT_DIR.parent / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+# 4. Local Imports
 from pipeline_utils import DEFAULT_RELEASE, setup_logger
 
 # =============================================================================

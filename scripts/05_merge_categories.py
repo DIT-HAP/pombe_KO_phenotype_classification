@@ -50,7 +50,13 @@ import pandas as pd
 # 3. Third-party Imports
 from loguru import logger
 
-# 4. Local Imports
+# 4. Project Path Setup
+SCRIPT_DIR = Path(__file__).resolve().parent
+SRC_DIR = SCRIPT_DIR.parent / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+# 5. Local Imports
 from category_revisions import DEFAULT_CONFIG, load_category_config
 from pipeline_utils import category_dr_medians, load_dit_hap, setup_logger
 

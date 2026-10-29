@@ -16,7 +16,7 @@ Rows, in draw order:
 3. ``microcolonies`` — ``Sub_category == "microcolonies"``
 4. ``small colonies`` — ``Sub_category == "small colonies"``
 5. ``WT-like (WT)`` — ``Sub_category == "WT-like"`` and
-   ``Morphological classification == "WT"``
+   ``Morphological_classification == "WT"``
 
 Every adjacent pair is annotated with a two-sided Mann-Whitney U p-value
 (raw, no multiple-comparison correction — the same choice as step 06).
@@ -32,7 +32,7 @@ Input
 -----
 - ``data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx``
   (sheet ``All genes``) — ``Systematic ID``, ``Sub_category``, and
-  ``Morphological classification``.
+  ``Morphological_classification``.
 - ``data/raw/gene_level_fitting_statistics_minusDR.tsv``
   — ``Systematic ID`` and sign-flipped ``DR`` (negative = depleted).
 - ``data/raw/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv``
@@ -80,7 +80,14 @@ from matplotlib.text import Text
 from matplotlib.textpath import TextPath
 from scipy.stats import mannwhitneyu
 
-# 4. Local Imports
+# 4. Project Path Setup
+SCRIPT_DIR = Path(__file__).resolve().parent
+SRC_DIR = SCRIPT_DIR.parent / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+# 5. Local Imports
+from phenotype import MORPHOLOGY_COL
 from pipeline_utils import load_dit_hap, load_grna, setup_logger
 
 # =============================================================================
@@ -98,7 +105,6 @@ DEFAULT_OUTPUT_DIR = Path("results")
 MERGED_SHEET = "All genes"
 ID_COL = "Systematic ID"
 SUB_CATEGORY_COL = "Sub_category"
-MORPHOLOGY_COL = "Morphological classification"
 
 # Internal long-form column names handed to cnsplots.
 VALUE_COL = "Value"

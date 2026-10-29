@@ -61,8 +61,15 @@ import pandas as pd
 # 3. Third-party Imports
 from loguru import logger
 
-# 4. Local Imports
+# 4. Project Path Setup
+SCRIPT_DIR = Path(__file__).resolve().parent
+SRC_DIR = SCRIPT_DIR.parent / "src"
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
+
+# 5. Local Imports
 from growth_signals import MODIFIER_DEGREE, MODIFIER_FREQ, MODIFIER_QUANT
+from phenotype import PHENOTYPE_DESC_COL
 from pipeline_utils import setup_logger
 
 # =============================================================================
@@ -187,7 +194,7 @@ IGNORED: set[str] = set(ALL_STEMS) | set(PHRASE_PATTERNS.values())
 # ——— Tokenisation ————————————————————————————————————————————————————————————
 
 # When reading from the final Excel, the description column name
-DESC_COL = "Deletion mutant phenotype description"
+DESC_COL = PHENOTYPE_DESC_COL
 TIER_COL = "Growth_tier"
 
 # =============================================================================
