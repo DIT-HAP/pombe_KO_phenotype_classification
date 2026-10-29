@@ -61,7 +61,6 @@ import argparse
 import sys
 from dataclasses import dataclass
 from functools import partial
-from itertools import pairwise
 from pathlib import Path
 
 # 2. Data Processing Imports
@@ -73,12 +72,6 @@ matplotlib.use("Agg")
 import cnsplots as cns
 import matplotlib.colors as mcolors
 from loguru import logger
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
-from matplotlib.font_manager import FontProperties
-from matplotlib.text import Text
-from matplotlib.textpath import TextPath
-from scipy.stats import mannwhitneyu
 
 # 4. Project Path Setup
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -87,28 +80,45 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 # 5. Local Imports
+from dr_plotting import (
+    CANVAS_SLACK_PT,
+    DEFAULT_DIT_HAP,
+    DEFAULT_GRNA,
+    DEFAULT_MERGED,
+    DEFAULT_OUTPUT_DIR,
+    FONT_FAMILY,
+    ID_COL,
+    LABEL_CHAR_PT,
+    MARGIN_RIGHT_PT,
+    MERGED_SHEET,
+    PAD_LEFT_PT,
+    PAD_TOP_PT,
+    PVALUE_MARGIN_PT,
+    PVALUE_NOTE,
+    ROW_COL,
+    STATS_PAD_PT,
+    STATS_SLACK_PT,
+    SUB_CATEGORY_COL,
+    VALUE_COL,
+    VALUE_RANGE,
+    FigureSpec,
+    Panel,
+    adjacent_pairs,
+    annotate_pairs,
+    build_long_frame,
+    draw_stats_panel,
+    log_category_stats,
+    log_pvalues,
+    scale_panel_labels,
+    scale_text,
+    stats_columns,
+)
 from phenotype import MORPHOLOGY_COL
 from pipeline_utils import load_dit_hap, load_grna, setup_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS & ENUMS
 # =============================================================================
-
-# The face every element of the figure is drawn in.
-FONT_FAMILY = "Arial"
-
-DEFAULT_MERGED = Path("data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx")
-DEFAULT_DIT_HAP = Path("data/raw/gene_level_fitting_statistics_minusDR.tsv")
-DEFAULT_GRNA = Path("data/raw/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv")
-DEFAULT_OUTPUT_DIR = Path("results")
-
-MERGED_SHEET = "All genes"
-ID_COL = "Systematic ID"
-SUB_CATEGORY_COL = "Sub_category"
-
-# Internal long-form column names handed to cnsplots.
-VALUE_COL = "Value"
-ROW_COL = "Row label"
 
 # Cell journal qualitative palette. The five rows take the first five colours
 # in draw order, which keeps adjacent rows maximally distinct.
@@ -119,36 +129,7 @@ PVALUE_NEUTRAL_COLOR = PALETTE[9]
 # Panel geometry in points (1/72 inch), matching the revised figure of step 06.
 ROW_HEIGHT_PT = 16.89
 PLOT_WIDTH_PT = 69.25
-PAD_LEFT_PT = 12
-PAD_TOP_PT = 12
-MARGIN_RIGHT_PT = 16
 FONT_SCALE = 1.0
-
-# Panel C is a table: one probe / count / median column per proxy, one row per
-# category. Columns are sized from their widest cell at STATS_FONTSIZE.
-STATS_ALIGN = ("left", "right", "right")
-STATS_COLUMN_GAP_PT = 5
-STATS_GROUP_GAP_PT = 13
-STATS_PAD_PT = 12
-STATS_SLACK_PT = 10
-STATS_FONTSIZE = 7
-LABEL_CHAR_PT = 4.4
-
-# Annotated panels reserve room for the bracket column and its labels.
-PVALUE_MARGIN_PT = 60
-CANVAS_SLACK_PT = 190
-
-# Matches the sign-flipped range covered by both proxies.
-VALUE_RANGE = (-2.2, 0.3)
-
-# P-value column: one column of brackets right of the axes, never staircased.
-PVALUE_GAP_PT = 6
-PVALUE_TICK_PT = 3
-PVALUE_TEXT_PT = 4
-PVALUE_INSET_PT = 3
-PVALUE_FONTSIZE = 7
-PVALUE_ALPHA = 0.05
-PVALUE_NOTE = "p: two-sided Mann-Whitney U (uncorrected)"
 
 
 # =============================================================================
@@ -176,30 +157,6 @@ PURE_ROWS: tuple[PureRow, ...] = (
         morphology="WT",
     ),
 )
-
-
-@dataclass(kw_only=True, slots=True, frozen=True)
-class Panel:
-    """One proxy panel: its long-form frame, value-axis label, and short name."""
-
-    frame: pd.DataFrame
-    xlabel: str
-    short_label: str
-
-
-@dataclass(kw_only=True, slots=True, frozen=True)
-class FigureSpec:
-    """Everything the figure needs besides the loaded data and colours."""
-
-    name: str
-    row_order: list[str]
-    panels: list[Panel]
-    pairs: list[tuple[str, str]]
-    output_path: Path
-    pvalue_note: str
-    row_height_pt: float
-    plot_width_pt: float
-    font_scale: float
 
 
 # =============================================================================
@@ -232,20 +189,6 @@ def select_pure_rows(merged: pd.DataFrame) -> pd.DataFrame:
     return selected
 
 
-def build_long_frame(
-    selected: pd.DataFrame,
-    values: pd.DataFrame,
-    value_col: str,
-) -> pd.DataFrame:
-    """Join one proxy's values onto the selected genes and reshape to long form."""
-    joined = selected.merge(values, on=ID_COL, how="inner")
-    frame = pd.DataFrame(
-        {
-            VALUE_COL: joined[value_col].to_numpy(),
-            ROW_COL: joined[ROW_COL].to_numpy(),
-        }
-    )
-    return frame.dropna(subset=[VALUE_COL])
 
 
 def build_row_colors() -> dict[str, str]:
@@ -267,65 +210,12 @@ def row_tick_labels(order: list[str], frame: pd.DataFrame) -> list[str]:
     return [f"{row} (n = {int(counts.get(row, 0))})" for row in order]
 
 
-def build_stats_rows(spec: FigureSpec) -> list[list[str]]:
-    """Panel C's cells: one list of that row's column strings per category."""
-    tables = [
-        (panel.short_label, panel.frame.groupby(ROW_COL)[VALUE_COL].agg(["size", "median"]))
-        for panel in spec.panels
-    ]
-    rows = []
-    for row in spec.row_order:
-        cells = []
-        for label, table in tables:
-            if row in table.index:
-                cells += [
-                    f"{label}:",
-                    f"n={int(table.loc[row, 'size'])}",
-                    f"med={table.loc[row, 'median']:.3f}",
-                ]
-            else:
-                cells += [f"{label}:", "n=-", "med=-"]
-        rows.append(cells)
-    return rows
 
 
-def text_width_pt(text: str, fontsize: float, weight: str) -> float:
-    """Width of one string in points, as the figure's own face draws it."""
-    prop = FontProperties(family=FONT_FAMILY, weight=weight, size=fontsize)
-    return TextPath((0, 0), text, prop=prop, size=fontsize).get_extents().width
 
 
-def stats_columns(spec: FigureSpec) -> tuple[list[tuple[float, float]], float]:
-    """Panel C's column edges in points — ``(left, right)`` each — and its width."""
-    rows = build_stats_rows(spec)
-    fontsize = STATS_FONTSIZE * spec.font_scale
-    widths = [
-        max(text_width_pt(row[column], fontsize, "bold") for row in rows)
-        for column in range(len(rows[0]))
-    ]
-    edges: list[tuple[float, float]] = []
-    cursor = 0.0
-    for column, width in enumerate(widths):
-        if column:
-            gap = STATS_GROUP_GAP_PT if column % len(STATS_ALIGN) == 0 else STATS_COLUMN_GAP_PT
-            cursor += gap * spec.font_scale
-        edges.append((cursor, cursor + width))
-        cursor += width
-    cursor = max(cursor, text_width_pt(spec.pvalue_note, fontsize, "normal"))
-    return edges, cursor
 
 
-def adjacent_pairs(order: list[str], panels: list[Panel]) -> list[tuple[str, str]]:
-    """Adjacent category pairs holding at least two observations in every panel."""
-    counts = [panel.frame[ROW_COL].value_counts() for panel in panels]
-    pairs = []
-    for first, second in pairwise(order):
-        sizes_present = [
-            int(table.get(row, 0)) for table in counts for row in (first, second)
-        ]
-        if min(sizes_present) >= 2:
-            pairs.append((first, second))
-    return pairs
 
 
 # =============================================================================
@@ -333,41 +223,12 @@ def adjacent_pairs(order: list[str], panels: list[Panel]) -> list[tuple[str, str
 # =============================================================================
 
 
-def pair_pvalue(frame: pd.DataFrame, first: str, second: str) -> float:
-    """Two-sided Mann-Whitney U p-value between two rows of one panel."""
-    left = frame.loc[frame[ROW_COL] == first, VALUE_COL]
-    right = frame.loc[frame[ROW_COL] == second, VALUE_COL]
-    return float(mannwhitneyu(left, right, alternative="two-sided").pvalue)
 
 
-def format_pvalue(pvalue: float) -> str:
-    """Format a p-value in scientific notation, e.g. ``p=1.2E-9`` (step 06 style)."""
-    mantissa, exponent = f"{pvalue:.1e}".split("e")
-    return f"p={mantissa.removesuffix('.0')}E{int(exponent)}"
 
 
-def log_category_stats(order: list[str], panels: list[Panel]) -> None:
-    """Log per-category sample size and median for every proxy."""
-    for panel in panels:
-        stats = panel.frame.groupby(ROW_COL)[VALUE_COL].agg(["size", "median"])
-        logger.info(f"  {panel.xlabel} — n / median per category")
-        for row in order:
-            if row in stats.index:
-                logger.info(
-                    f"    {row:<60} n={int(stats.loc[row, 'size']):<5} "
-                    f"med={stats.loc[row, 'median']:.3f}"
-                )
 
 
-def log_pvalues(pairs: list[tuple[str, str]], panels: list[Panel]) -> None:
-    """Log the two-sided Mann-Whitney U p-value of every annotated pair and panel."""
-    for panel in panels:
-        logger.info(f"  {panel.xlabel} — two-sided Mann-Whitney U (no correction)")
-        for first, second in pairs:
-            logger.info(
-                f"    {first:<32} vs {second:<32} "
-                f"p={pair_pvalue(panel.frame, first, second):.3e}"
-            )
 
 
 # =============================================================================
@@ -375,97 +236,12 @@ def log_pvalues(pairs: list[tuple[str, str]], panels: list[Panel]) -> None:
 # =============================================================================
 
 
-def annotate_pairs(
-    ax: Axes,
-    order: list[str],
-    frame: pd.DataFrame,
-    pairs: list[tuple[str, str]],
-    plot_width_pt: float,
-    row_height_pt: float,
-    font_scale: float,
-) -> None:
-    """Draw every adjacent-pair p-value on one bracket column right of the axes."""
-    positions = {row: index for index, row in enumerate(order)}
-    # The category axis puts one row every row_height_pt points, so the point
-    # inset converts into the data units the bracket ends are measured in.
-    inset = PVALUE_INSET_PT / row_height_pt
-    transform = ax.get_yaxis_transform()
-    inner_x = 1 + PVALUE_GAP_PT / plot_width_pt
-    outer_x = 1 + (PVALUE_GAP_PT + PVALUE_TICK_PT) / plot_width_pt
-    text_x = 1 + (PVALUE_GAP_PT + PVALUE_TICK_PT + PVALUE_TEXT_PT) / plot_width_pt
-    for first, second in pairs:
-        pvalue = pair_pvalue(frame, first, second)
-        significant = pvalue < PVALUE_ALPHA
-        color = PVALUE_SIGNIFICANT_COLOR if significant else PVALUE_NEUTRAL_COLOR
-        top, bottom = positions[first] + inset, positions[second] - inset
-        for row in (top, bottom):
-            ax.plot(
-                [inner_x, outer_x], [row, row],
-                transform=transform, color=color, linewidth=0.6, clip_on=False,
-            )
-        ax.plot(
-            [outer_x, outer_x], [top, bottom],
-            transform=transform, color=color, linewidth=0.6, clip_on=False,
-        )
-        ax.text(
-            text_x, (top + bottom) / 2, format_pvalue(pvalue),
-            transform=transform, ha="left", va="center",
-            color=color, fontsize=PVALUE_FONTSIZE * font_scale,
-            fontweight="bold" if significant else "normal", clip_on=False,
-        )
 
 
-def draw_stats_panel(
-    ax: Axes,
-    spec: FigureSpec,
-    row_axis: Axes,
-    columns: list[tuple[float, float]],
-    width_pt: float,
-) -> None:
-    """Draw the per-row sample sizes and medians as its own axes-less panel."""
-    fontsize = STATS_FONTSIZE * spec.font_scale
-    rows = build_stats_rows(spec)
-    aligns = STATS_ALIGN * len(spec.panels)
-    for index, cells in enumerate(rows):
-        for (left, right), align, cell in zip(columns, aligns, cells):
-            ax.text(
-                (right if align == "right" else left) / width_pt, index, cell,
-                ha=align, va="center", family=FONT_FAMILY,
-                fontsize=fontsize, fontweight="bold",
-            )
-    ax.text(
-        0, len(rows), spec.pvalue_note, ha="left", va="center",
-        family=FONT_FAMILY, fontsize=fontsize, fontweight="normal",
-    )
-    # Copy the categorical limits (including their inversion) so the text rows
-    # line up with the violins; this panel carries no axes of its own.
-    ax.set_xlim(0, 1)
-    ax.set_ylim(*row_axis.get_ylim())
-    ax.axis("off")
 
 
-def scale_text(ax: Axes, scale: float) -> None:
-    """Scale every text artist cnsplots created on one axes, keeping it in proportion."""
-    if scale == 1.0:
-        return
-    for axis in ("x", "y"):
-        size = (
-            ax.get_xticklabels()[0].get_fontsize()
-            if axis == "x"
-            else ax.get_yticklabels()[0].get_fontsize()
-        )
-        ax.tick_params(axis=axis, which="both", labelsize=size * scale)
-    for label in (ax.xaxis.label, ax.yaxis.label):
-        label.set_fontsize(label.get_fontsize() * scale)
 
 
-def scale_panel_labels(fig: Figure, labels: list[str], scale: float) -> None:
-    """Scale multipanel's own A/B/C lettering, which lives outside the axes."""
-    if scale == 1.0:
-        return
-    for text in fig.findobj(match=Text):
-        if text.get_text() in labels:
-            text.set_fontsize(text.get_fontsize() * scale)
 
 
 def use_single_face() -> None:
@@ -541,6 +317,8 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
             annotate_pairs(
                 axes[index], spec.row_order, panel.frame, spec.pairs,
                 spec.plot_width_pt, spec.row_height_pt, spec.font_scale,
+                significant_color=PVALUE_SIGNIFICANT_COLOR,
+                neutral_color=PVALUE_NEUTRAL_COLOR,
             )
 
     # Sample sizes and medians live in their own trailing panel, so the tick
@@ -596,12 +374,12 @@ def build_spec(
     """Build the five-row figure spec from the selected genes."""
     panels = [
         Panel(
-            frame=build_long_frame(selected, dit_hap, "DR"),
+            frame=build_long_frame(selected, dit_hap, "DR", row_col=ROW_COL),
             xlabel="DR — DIT-HAP",
             short_label="DR",
         ),
         Panel(
-            frame=build_long_frame(selected, grna, "um"),
+            frame=build_long_frame(selected, grna, "um", row_col=ROW_COL),
             xlabel="um — gRNA",
             short_label="um",
         ),

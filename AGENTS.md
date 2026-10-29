@@ -56,7 +56,7 @@ DIT-HAP/gRNA depletion-rate validation.
 ## Testing
 
 ```bash
-mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (124 tests, ~3s)
+mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (127 tests, ~3s)
 mamba run -n bioinformatics python -m pytest tests/test_growth_signals.py -v
 mamba run -n bioinformatics python -m pytest tests/test_classification.py -v
 mamba run -n bioinformatics python -m pytest tests/test_dataset_merge.py -v
@@ -90,6 +90,9 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
 - `src/phenotype.py` — canonical 01 column names (`Phenotype_description`,
   `Morphological_classification`, `Gene_dispensability`) and
   `format_hayles_phenotypes()`. Imported by `01`, `02`, `03`, `04` and `07`.
+- `src/dr_plotting.py` — shared DR/um plotting primitives: long-form frames,
+  stats-table columns and p-value brackets. Imported by `06` and `07`; it
+  needs matplotlib and scipy but not cnsplots.
 - `src/pipeline_utils.py` — shared `setup_logger`, `load_dit_hap`,
   `category_dr_medians`, and the `DEFAULT_RELEASE` constant.
 - `src/category_revisions.py` — shared loader for

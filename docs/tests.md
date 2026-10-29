@@ -2,17 +2,18 @@
 
 ## Overview
 
-Nine test files, 124 tests total, all passing:
+Ten test files, 127 tests total, all passing:
 
 ```
 mamba run -n bioinformatics python -m pytest tests/ -v
-124 passed in ~3s
+127 passed in ~5s
 ```
 
 - `tests/test_growth_signals.py` — 36 tests (end-to-end classification)
 - `tests/test_classification.py` — 40 tests (Single/Multiple logic + phenotype splitting)
 - `tests/test_category_revisions.py` — 14 tests (category config loader + merge application)
 - `tests/test_dataset_merge.py` — 7 tests (Kim/Hayles source loaders)
+- `tests/test_dr_plotting.py` — 3 tests (shared DR/um plotting helpers)
 - `tests/test_id_mapping.py` — 9 tests (shared PomBase ID update, paralogs, names, notes)
 - `tests/test_keyword_profile.py` — 3 tests (data-derived tier labels + term table)
 - `tests/test_phenotype.py` — 2 tests (shared column names + phenotype formatting)
@@ -269,6 +270,14 @@ loader row counts and the repaired Excel-date gene names. The retired
 | `test_tier_labels_from_frame_uses_categories` | `Growth_tier` → modal `Category` from the input table |
 | `test_tier_label_falls_back_for_unknown_tier` | unknown tier → `Tier N` |
 | `test_build_term_table_uses_data_derived_labels` | output columns use the derived labels |
+
+## `tests/test_dr_plotting.py` — shared plotting helpers (3 tests)
+
+| Test | What it pins down |
+|---|---|
+| `test_format_pvalue_scientific_notation` | `p=1.2E-9` formatting |
+| `test_build_long_frame_without_group` | value/row columns and dropped missing values |
+| `test_build_long_frame_with_group` | the optional merged-category column |
 
 ---
 

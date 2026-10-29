@@ -60,6 +60,7 @@ pombe_KO_phenotype_classification/
 │   ├── id_mapping.py           shared PomBase ID update
 │   ├── phenotype.py            shared phenotype column names + formatting
 │   ├── dataset_merge.py        shared 2010/2013 loaders + duplicate-ID collapse
+│   ├── dr_plotting.py          shared DR/um plotting helpers
 │   ├── category_revisions.py   shared category order + merge mapping
 │   └── pipeline_utils.py       shared logging + DIT-HAP helpers
 └── scripts/
@@ -172,7 +173,7 @@ Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx` and
 
 ## Test suite
 
-124 tests covering signal detection, modifier handling, segment filtering,
+127 tests covering signal detection, modifier handling, segment filtering,
 Single/Multiple classification, the Kim-2010/Hayles-2013 loaders, and the
 shared ID-mapping and phenotype-formatting modules:
 
