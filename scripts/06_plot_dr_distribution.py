@@ -56,15 +56,13 @@ Input
 
 Output
 ------
-- ``results/DR_um_distribution_original.{png,pdf}`` — 2616 x 1197 px
-- ``results/DR_um_distribution_revised.{png,pdf}`` — 2171 x 594 px
+- ``results/DR_um_distribution_original.{png,pdf}`` — 2421 x 1825 px
+- ``results/DR_um_distribution_revised.{png,pdf}`` — 1817 x 594 px
 
-Both are sized to those pixels at the 288 dpi savefig default by per-figure
-geometry constants near the top of the file (calibrated by rendering and
-measuring; see the per-figure zoom block), so the two figures differ in row
-height, panel width and — for the tall one — text scale. Width, unlike height,
-is content-tight: the export crops to the drawn extent, so narrowing any panel
-narrows the image by the same amount.
+Each violin axes is 100 px wide at the 288 dpi savefig default (25 pt); height
+grows with the row count. Text keeps ``cnsplots``' default sizes. Width, unlike
+height, is content-tight: the export crops to the drawn extent, so the row
+labels and the stats table set the final canvas width.
 
 Every element of both figures — axis labels, tick labels and panel C's table
 alike — is set in one face, Arial (``FONT_FAMILY``).
@@ -123,6 +121,7 @@ from dr_plotting import (
     MERGED_SHEET,
     PAD_LEFT_PT,
     PAD_TOP_PT,
+    PANEL_WIDTH_PT,
     PVALUE_MARGIN_PT,
     PVALUE_NOTE,
     ROW_COL,
@@ -139,8 +138,6 @@ from dr_plotting import (
     draw_stats_panel,
     log_category_stats,
     log_pvalues,
-    scale_panel_labels,
-    scale_text,
     stats_columns,
 )
 from pipeline_utils import load_dit_hap, load_grna, setup_logger
@@ -151,34 +148,11 @@ from pipeline_utils import load_dit_hap, load_grna, setup_logger
 
 CATEGORY_COL = "Category"
 
-# Panel geometry in points (1/72 inch). Row height must fit one 8 pt tick label
-# (≈ 11 pt tall) and one 7 pt stats line, so it bounds how low the figure can go.
-# The two figures carry very different row counts — 50 vs 7 — and are limited by
-# different dimensions, so each spec scales the base geometry for its own figure
-# (see the spec builders): the tall one trades row height for height, the wide
-# one trades panel width for width.
-PLOT_WIDTH_PT = 185
-ROW_HEIGHT_PT = 18
-# --- per-figure zoom ---------------------------------------------------------
-# Each figure independently scales the design geometry above to reach its target
-# pixel size at the 288 dpi savefig default. The values are calibrated by
-# rendering and measuring the saved PNG — multipanel's panel units do not map
-# linearly to output pixels, so they cannot be computed from the target alone.
-
-# 50 rows, height-limited (≈1200 px tall). Row height the layout and its text
-# sizes are designed at: there, the one-line labels of adjacent rows just fit.
-DESIGN_ROW_HEIGHT_PT = 14.2
-ORIGINAL_ROW_HEIGHT_PT = 9.115
-ORIGINAL_PLOT_WIDTH_PT = 142.4
-# Text zooms with the rows. Leaving it full size while rows tighten is what makes
-# adjacent labels collide, so this is derived, never set by hand.
-ORIGINAL_FONT_SCALE = round(ORIGINAL_ROW_HEIGHT_PT / DESIGN_ROW_HEIGHT_PT, 3)
-
-# 7 rows, width-limited (≈600 px tall). Rows stay near the design height, so the
-# text keeps its natural size; the x axis keeps three ticks at this panel width
-# (matplotlib drops the 0.5 ones).
+# Panel geometry. The violin axes are 100 px wide in the 288 dpi export
+# (PANEL_WIDTH_PT = 25 pt); height grows with the number of rows. Text keeps
+# cnsplots' default sizes, so a row only has to clear one 7 pt tick label.
+ORIGINAL_ROW_HEIGHT_PT = 14.2
 REVISED_ROW_HEIGHT_PT = 16.89
-REVISED_PLOT_WIDTH_PT = 69.25
 
 # P-value bracket colours for this script's figures.
 PVALUE_SIGNIFICANT_COLOR = "red"
@@ -321,7 +295,7 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
     stats_width += STATS_SLACK_PT
     margin_right = PVALUE_MARGIN_PT if spec.pairs else MARGIN_RIGHT_PT
     canvas_width = (
-        2 * (spec.plot_width_pt + PAD_LEFT_PT + label_width + margin_right)
+        2 * (PANEL_WIDTH_PT + PAD_LEFT_PT + label_width + margin_right)
         + stats_width
         + STATS_PAD_PT
         + CANVAS_SLACK_PT
@@ -332,7 +306,7 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
     for index, panel in enumerate(spec.panels):
         ax = mp.panel(
             chr(ord("A") + index),
-            width=spec.plot_width_pt,
+            width=PANEL_WIDTH_PT,
             height=plot_height,
             pad_left=PAD_LEFT_PT,
             pad_top=PAD_TOP_PT,
@@ -356,7 +330,6 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
         ax.set_xlabel(panel.xlabel)
         ax.set_ylabel("")
         ax.set_xlim(*VALUE_RANGE)
-        scale_text(ax, spec.font_scale)
         if index:
             ax.tick_params(labelleft=False)
         axes.append(ax)
@@ -372,7 +345,7 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
         if spec.pairs:
             annotate_pairs(
                 axes[index], spec.row_order, panel.frame, spec.pairs,
-                spec.plot_width_pt, spec.row_height_pt, spec.font_scale,
+                PANEL_WIDTH_PT, spec.row_height_pt,
                 significant_color=PVALUE_SIGNIFICANT_COLOR,
                 neutral_color=PVALUE_NEUTRAL_COLOR,
             )
@@ -393,10 +366,6 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
 
     if spec.show_legend:
         draw_group_legend(stats_ax, spec, colors)
-        # After the legend exists, so its own text is zoomed with the rest.
-        scale_text(stats_ax, spec.font_scale)
-
-    scale_panel_labels(mp.fig, [chr(ord("A") + index) for index in range(len(spec.panels) + 1)], spec.font_scale)
 
     output_path = spec.output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -460,8 +429,6 @@ def build_original_spec(
         show_legend=True,
         pvalue_note=None,
         row_height_pt=ORIGINAL_ROW_HEIGHT_PT,
-        plot_width_pt=ORIGINAL_PLOT_WIDTH_PT,
-        font_scale=ORIGINAL_FONT_SCALE,
     )
 
 
@@ -499,8 +466,6 @@ def build_revised_spec(
         show_legend=False,
         pvalue_note=PVALUE_NOTE,
         row_height_pt=REVISED_ROW_HEIGHT_PT,
-        plot_width_pt=REVISED_PLOT_WIDTH_PT,
-        font_scale=1.0,
     )
 
 

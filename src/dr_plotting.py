@@ -34,9 +34,7 @@ import pandas as pd
 # 3. Third-party Imports
 from loguru import logger
 from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 from matplotlib.font_manager import FontProperties
-from matplotlib.text import Text
 from matplotlib.textpath import TextPath
 from scipy.stats import mannwhitneyu
 
@@ -62,9 +60,12 @@ ROW_COL = "Row label"
 GROUP_COL = "Merged category"
 
 # Shared panel geometry in points (1/72 inch).
+# 25 pt is 100 px in the 288 dpi export (1 pt = 4 px), the target width of one
+# violin axes area. Height is set per figure from the row count.
+PANEL_WIDTH_PT = 25
 PAD_LEFT_PT = 12
 PAD_TOP_PT = 12
-MARGIN_RIGHT_PT = 16
+MARGIN_RIGHT_PT = 32
 STATS_PAD_PT = 12
 STATS_SLACK_PT = 10
 CANVAS_SLACK_PT = 190
@@ -78,6 +79,8 @@ VALUE_RANGE = (-2.2, 0.3)
 STATS_ALIGN = ("left", "right", "right")
 STATS_COLUMN_GAP_PT = 5
 STATS_GROUP_GAP_PT = 13
+# Custom text matches cnsplots' default tick/legend size (7 pt), so it needs
+# no per-figure scaling even when the row count is large.
 STATS_FONTSIZE = 7
 
 # P-value column offsets, in points from the axes' right edge.
@@ -117,8 +120,6 @@ class FigureSpec:
     output_path: Path
     pvalue_note: str | None
     row_height_pt: float
-    plot_width_pt: float
-    font_scale: float
     row_groups: dict[str, str] = field(default_factory=dict)
     boundaries: list[float] = field(default_factory=list)
     show_legend: bool = False
@@ -190,7 +191,7 @@ def stats_columns(spec: FigureSpec) -> tuple[list[tuple[float, float]], float]:
     it, whichever is longer.
     """
     rows = build_stats_rows(spec)
-    fontsize = STATS_FONTSIZE * spec.font_scale
+    fontsize = STATS_FONTSIZE
     widths = [
         max(text_width_pt(row[column], fontsize, "bold") for row in rows)
         for column in range(len(rows[0]))
@@ -200,7 +201,7 @@ def stats_columns(spec: FigureSpec) -> tuple[list[tuple[float, float]], float]:
     for column, width in enumerate(widths):
         if column:
             gap = STATS_GROUP_GAP_PT if column % len(STATS_ALIGN) == 0 else STATS_COLUMN_GAP_PT
-            cursor += gap * spec.font_scale
+            cursor += gap
         edges.append((cursor, cursor + width))
         cursor += width
     if spec.pvalue_note:
@@ -275,7 +276,6 @@ def annotate_pairs(
     pairs: list[tuple[str, str]],
     plot_width_pt: float,
     row_height_pt: float,
-    font_scale: float,
     *,
     significant_color: str,
     neutral_color: str,
@@ -306,7 +306,7 @@ def annotate_pairs(
         ax.text(
             text_x, (top + bottom) / 2, format_pvalue(pvalue),
             transform=transform, ha="left", va="center",
-            color=color, fontsize=PVALUE_FONTSIZE * font_scale,
+            color=color, fontsize=PVALUE_FONTSIZE,
             fontweight="bold" if significant else "normal", clip_on=False,
         )
 
@@ -326,7 +326,7 @@ def draw_stats_panel(
     outside the copied row limits, which ``ax.text`` renders unclipped — and is
     set in the light weight of the same face to read as a note, not a row.
     """
-    fontsize = STATS_FONTSIZE * spec.font_scale
+    fontsize = STATS_FONTSIZE
     rows = build_stats_rows(spec)
     aligns = STATS_ALIGN * len(spec.panels)
     for index, cells in enumerate(rows):
@@ -346,31 +346,3 @@ def draw_stats_panel(
     ax.set_xlim(0, 1)
     ax.set_ylim(*row_axis.get_ylim())
     ax.axis("off")
-
-
-def scale_text(ax: Axes, scale: float) -> None:
-    """Scale every text artist cnsplots created on one axes, keeping it in proportion."""
-    if scale == 1.0:
-        return
-    for axis in ("x", "y"):
-        size = (
-            ax.get_xticklabels()[0].get_fontsize()
-            if axis == "x"
-            else ax.get_yticklabels()[0].get_fontsize()
-        )
-        ax.tick_params(axis=axis, which="both", labelsize=size * scale)
-    for label in (ax.xaxis.label, ax.yaxis.label):
-        label.set_fontsize(label.get_fontsize() * scale)
-    legend = ax.get_legend()
-    if legend is not None:
-        for text in (*legend.get_texts(), legend.get_title()):
-            text.set_fontsize(text.get_fontsize() * scale)
-
-
-def scale_panel_labels(fig: Figure, labels: list[str], scale: float) -> None:
-    """Scale multipanel's own A/B/C lettering, which lives outside the axes."""
-    if scale == 1.0:
-        return
-    for text in fig.findobj(match=Text):
-        if text.get_text() in labels:
-            text.set_fontsize(text.get_fontsize() * scale)

@@ -21,7 +21,9 @@ Rows, in draw order:
 Every adjacent pair is annotated with a two-sided Mann-Whitney U p-value
 (raw, no multiple-comparison correction — the same choice as step 06).
 The bracket column, label format and row layout match the revised cnsplots
-figure. Colours come from the Cell journal qualitative palette: significant
+figure. Each violin axes is 100 px wide at the 288 dpi export (25 pt); height
+grows with the row count and text keeps cnsplots' default sizes. Colours come
+from the Cell journal qualitative palette: significant
 p-values (p < 0.05) in the palette terracotta and the rest in the palette
 grey. The five row colours are the first five Cell colours in draw order,
 which keeps them maximally distinct. Both violin panels repeat the row
@@ -93,6 +95,7 @@ from dr_plotting import (
     MERGED_SHEET,
     PAD_LEFT_PT,
     PAD_TOP_PT,
+    PANEL_WIDTH_PT,
     PVALUE_MARGIN_PT,
     PVALUE_NOTE,
     ROW_COL,
@@ -109,8 +112,6 @@ from dr_plotting import (
     draw_stats_panel,
     log_category_stats,
     log_pvalues,
-    scale_panel_labels,
-    scale_text,
     stats_columns,
 )
 from phenotype import MORPHOLOGY_COL
@@ -126,10 +127,10 @@ PALETTE = [mcolors.to_hex(tuple(color)) for color in cns.palettes("Cell")]
 PVALUE_SIGNIFICANT_COLOR = PALETTE[0]
 PVALUE_NEUTRAL_COLOR = PALETTE[9]
 
-# Panel geometry in points (1/72 inch), matching the revised figure of step 06.
+# Panel geometry. The violin axes are 100 px wide in the 288 dpi export
+# (PANEL_WIDTH_PT = 25 pt); height grows with the number of rows. Text keeps
+# cnsplots' default sizes, so a row only has to clear one 7 pt tick label.
 ROW_HEIGHT_PT = 16.89
-PLOT_WIDTH_PT = 69.25
-FONT_SCALE = 1.0
 
 
 # =============================================================================
@@ -269,7 +270,7 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
     stats_width += STATS_SLACK_PT
     margin_right = PVALUE_MARGIN_PT if spec.pairs else MARGIN_RIGHT_PT
     canvas_width = (
-        2 * (spec.plot_width_pt + PAD_LEFT_PT + label_width + margin_right)
+        2 * (PANEL_WIDTH_PT + PAD_LEFT_PT + label_width + margin_right)
         + stats_width
         + STATS_PAD_PT
         + CANVAS_SLACK_PT
@@ -280,7 +281,7 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
     for index, panel in enumerate(spec.panels):
         ax = mp.panel(
             chr(ord("A") + index),
-            width=spec.plot_width_pt,
+            width=PANEL_WIDTH_PT,
             height=plot_height,
             pad_left=PAD_LEFT_PT,
             pad_top=PAD_TOP_PT,
@@ -309,14 +310,13 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
             range(len(spec.row_order)),
             labels=tick_labels[index],
         )
-        scale_text(ax, spec.font_scale)
         axes.append(ax)
 
     for index, panel in enumerate(spec.panels):
         if spec.pairs:
             annotate_pairs(
                 axes[index], spec.row_order, panel.frame, spec.pairs,
-                spec.plot_width_pt, spec.row_height_pt, spec.font_scale,
+                PANEL_WIDTH_PT, spec.row_height_pt,
                 significant_color=PVALUE_SIGNIFICANT_COLOR,
                 neutral_color=PVALUE_NEUTRAL_COLOR,
             )
@@ -333,12 +333,6 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
         margin_right=MARGIN_RIGHT_PT,
     )
     draw_stats_panel(stats_ax, spec, axes[0], columns, stats_width)
-
-    scale_panel_labels(
-        mp.fig,
-        [chr(ord("A") + index) for index in range(len(spec.panels) + 1)],
-        spec.font_scale,
-    )
 
     output_path = spec.output_path
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -398,8 +392,6 @@ def build_spec(
         output_path=output_dir / "DR_um_distribution_pure.png",
         pvalue_note=PVALUE_NOTE,
         row_height_pt=ROW_HEIGHT_PT,
-        plot_width_pt=PLOT_WIDTH_PT,
-        font_scale=FONT_SCALE,
     )
 
 
