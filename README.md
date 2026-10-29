@@ -59,7 +59,7 @@ pombe_KO_phenotype_classification/
 │   ├── growth_signals.py       shared signal-detection engine
 │   ├── id_mapping.py           shared PomBase ID update
 │   ├── phenotype.py            shared phenotype column names + formatting
-│   ├── dataset_merge.py        shared 2010/2013 loaders + union merge
+│   ├── dataset_merge.py        shared 2010/2013 loaders + duplicate-ID collapse
 │   ├── category_revisions.py   shared category order + merge mapping
 │   └── pipeline_utils.py       shared logging + DIT-HAP helpers
 └── scripts/
@@ -76,15 +76,15 @@ pombe_KO_phenotype_classification/
 
 ## Kim 2010 vs Hayles 2013 reconciliation
 
-The archived `01_format_and_update_ids.py` (in `tmp/01_format_and_update_ids/`)
-updated IDs/names in both tables **before** building a 4,913-row gene-level
-union (via `src/dataset_merge.py`) with `Presence` (`both` / `2010_only` /
+The archived `01_format_and_update_ids.py` (in `tmp/01_format_and_update_ids/`,
+gitignored and local-only) updated IDs/names in both tables **before**
+building a 4,913-row gene-level union with `Presence` (`both` / `2010_only` /
 `2013_only` / `neither`), `Dispensability_consistency`,
 `Dispensability_discrepancy` and `Dispensability_change_class`, plus
 `Gene product` (PomBase) and `Paralog`/`Paralog_gene_name` (Kim data, current
-IDs/names). The live pipeline starts at `01_format_hayles_phenotypes.py`; it
-uses the same ID maps and Kim `Paralog`, but does not build the union. Key
-facts:
+IDs/names). The archive vendors its own frozen `src/dataset_merge.py` copy.
+The live pipeline starts at `01_format_hayles_phenotypes.py`; it uses the same
+ID maps and Kim `Paralog`, but does not build the union. Key facts:
 
 - The 2010 `.xls` is the **full Supplementary Table 1**: 4,914 candidate
   genes, of which 4,836 were constructed.
@@ -172,7 +172,7 @@ Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx` and
 
 ## Test suite
 
-118 tests covering signal detection, modifier handling, segment filtering,
+117 tests covering signal detection, modifier handling, segment filtering,
 Single/Multiple classification, the Kim-2010/Hayles-2013 loaders, and the
 shared ID-mapping and phenotype-formatting modules:
 

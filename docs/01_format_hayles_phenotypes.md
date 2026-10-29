@@ -69,4 +69,4 @@ mamba run -n bioinformatics python scripts/01_format_hayles_phenotypes.py
 - `SPAC1556.06.1` 更新为 `SPAC1556.06`。`note` 仍是 `NO_CHANGE`（已知问题）。
 - `SPBC8E4.02c` 保留旧 ID。`Gene name`、`Gene product`、`Gene type` 来自 synonym `SPNCRNA.9001`。
 - 5 个 `RECLASSIFIED` 行：4 个 pseudogene，1 个 lncRNA。Hayles 表中有 3 个 pseudogene 和 1 个 lncRNA。
-- 旧 `01_format_and_update_ids.py` 已移到 `tmp/01_format_and_update_ids/`。它生成 25 列旧表和 changelog，不再进入当前流程。
+- 旧 `01_format_and_update_ids.py` 已移到 `tmp/01_format_and_update_ids/`（gitignored，仅本机）。它生成 25 列旧表和 changelog，不再进入当前流程。

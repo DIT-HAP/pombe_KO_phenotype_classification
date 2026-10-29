@@ -1,11 +1,13 @@
 # Kim 2010 vs Hayles 2013 deletion datasets: reconciliation and data-quality notes
 
 > **Archive note (2026-10-29).** This note describes the archived
-> `01_format_and_update_ids.py` union, now in `tmp/01_format_and_update_ids/`.
-> The live pipeline starts at `01_format_hayles_phenotypes.py` and does not
-> build the union. The per-gene facts below still apply. Columns named
-> `Hayles2013_*` belong to the archived schema; the live `01` table calls the
-> study call `Gene_dispensability`.
+> `01_format_and_update_ids.py` union, now in `tmp/01_format_and_update_ids/`
+> (gitignored and untracked, so present only in this working copy). The
+> archive vendors its own frozen `src/` copy; function and column names below
+> refer to that copy, not the live `src/`. The live pipeline starts at
+> `01_format_hayles_phenotypes.py` and does not build the union. The per-gene
+> facts below still apply. Columns named `Hayles2013_*` belong to the archived
+> schema; the live `01` table calls the study call `Gene_dispensability`.
 
 This note records the reconciliation behind the question: **why do some genes
 have a 2010 dispensability result but no 2013 result?** It is the analytical
@@ -38,12 +40,13 @@ Hayles 2013, Methods 5.1:
 `4,836 - 11 = 4,825`, so the 11 are exactly the difference between Kim's
 constructed collection and the 4,825 Kim strains used by Hayles.
 
-The loaders and reconciliation primitives live in the shared module
-`src/dataset_merge.py`. The archived `01_format_and_update_ids.py` uses them
-to build the production union table (`Presence`,
+The archived `01_format_and_update_ids.py` vendors a frozen copy of the
+loaders under `tmp/01_format_and_update_ids/src/dataset_merge.py` (gitignored
+and local-only) and uses it to build the union table (`Presence`,
 `Dispensability_consistency`, `Dispensability_discrepancy`,
 `Dispensability_change_class`); the sections below record the interpretation
-that is not encoded in those columns.
+that is not encoded in those columns. The live `src/dataset_merge.py` contains
+only the source loaders and duplicate-ID collapse.
 
 ## 1. What each file contains
 
@@ -418,7 +421,7 @@ The most important pitfalls, all handled by the loader or recorded here:
 ## 7. Reproducing the reconciliation
 
 The machine-readable reconciliation is the union table written by the
-archived `01`:
+archived `01`. It lives only in `tmp/`, which is gitignored and untracked:
 
 ```python
 import pandas as pd

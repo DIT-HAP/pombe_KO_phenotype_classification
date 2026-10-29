@@ -2,20 +2,21 @@
 
 ## Overview
 
-Seven test files, 118 tests total, all passing:
+Eight test files, 117 tests total, all passing:
 
 ```
 mamba run -n bioinformatics python -m pytest tests/ -v
-118 passed in ~3s
+117 passed in ~3s
 ```
 
 - `tests/test_growth_signals.py` — 36 tests (end-to-end classification)
 - `tests/test_classification.py` — 39 tests (Single/Multiple logic)
 - `tests/test_category_revisions.py` — 13 tests (category config loader)
-- `tests/test_dataset_merge.py` — 16 tests (loaders + raw 2010/2013 union + Kim Table S3)
+- `tests/test_dataset_merge.py` — 7 tests (Kim/Hayles source loaders)
 - `tests/test_id_mapping.py` — 8 tests (shared PomBase ID update, paralogs, names, notes)
 - `tests/test_phenotype.py` — 2 tests (shared column names + phenotype formatting)
 - `tests/test_pipeline_utils.py` — 4 tests (shared helpers)
+- `tests/test_run_pipeline.py` — 8 tests (runner selection and dry-run)
 
 The archived `01_format_and_update_ids.py` integration test (17 tests) lives with its script in
 `tmp/01_format_and_update_ids/tests/`.
@@ -222,27 +223,18 @@ loader for the category JSON (`sub_category_order` / `revisions` /
 
 ---
 
-## `tests/test_dataset_merge.py` — loaders + 2010/2013 union table (16 tests)
+## `tests/test_dataset_merge.py` — source loaders (7 tests)
 
-Loader/normalisation tests pin the input parsing; synthetic-frame tests cover
-every `Presence` value and the consistency/change-class logic; one real-data
-test checks the actual tables.
+Normalisation tests pin the input parsing; one real-data test checks the
+loader row counts and the repaired Excel-date gene names. The retired
+25-column union and Table S3 parsers are no longer in the live module.
 
 | Test | What it pins down |
 |---|---|
 | `test_normalize_id_strips_all_whitespace` | whitespace removal and missing-value handling |
 | `test_normalize_call_maps_words_and_stray_spaces` | `viable`/`essential` and stray spaces → `V`/`E` |
 | `test_reconstruct_gene_name_from_date` | Excel date cells → `Oct-1`, `Sep-11`, `Sep-1` |
-| `test_parse_table_s3_repairs_truncated_id` | Table S3 `SPAC13D6.0` → `SPAC13D6.05` |
-| `test_merged_presence_column` | `both` / `2010_only` / `2013_only` / `neither` assignment |
-| `test_merged_consistency_column` | `consistent` when analysis == study; `inconsistent` otherwise; `not_comparable` for one-sided rows |
-| `test_merged_change_classes_and_discrepancy` | `no_change`, `documented_change`, `matches_kim2010_deletion_not_analysis`, `kim2010_deletion_analysis_discrepancy`, `hayles2013_addition`, `no_hayles2013_row`, `no_data_either`; discrepancy text and Table S3 comment |
-| `test_merged_gene_name_prefers_2013_then_falls_back_to_2010` | canonical `Gene name` selection |
-| `test_merged_keeps_source_columns` | 2010 columns survive under `Kim2010_*` |
-| `test_merged_without_table_s3_marks_changed_rows_accordingly` | graceful degradation to `changed_table_s3_not_available` |
-| `test_real_inputs_build_expected_union` | raw merge before 01's ID collapse: 4,914 rows; 4,836 constructed; 4,843 Hayles rows; the three repaired Excel-date names; presence 4,825 / 18 / 11 / 60; consistency 4,796 / 29 / 89; change-class counts (Table S3 counts only when the docx is present) |
-| `test_kim_table_s3_matches_table_s1` | the 40-row Kim Table S3 TSV: numbering, calls, criteria counts and footnote rows match Table S1 |
-| `test_kim_table_s3_validation_rejects_transcription_errors` | a dropped row, a non-disagreement ID, criteria drift and a moved footnote all raise |
+| `test_real_inputs_load_expected_rows` | real tables: 4,914 Kim rows, 4,836 constructed, 4,843 Hayles rows, and the three repaired Excel-date names |
 
 ---
 

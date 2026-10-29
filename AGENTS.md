@@ -40,9 +40,10 @@ DIT-HAP/gRNA depletion-rate validation.
   4,843 rows). The last file feeds `03`.
 
   The old `01_format_and_update_ids.py` and its six 25-column/union outputs
-  are archived in `tmp/01_format_and_update_ids/`; it is not part of the live
-  pipeline. `src/dataset_merge.py` still contains the union builder used by
-  the archived script and its tests.
+  are archived in `tmp/01_format_and_update_ids/` (gitignored and untracked,
+  so present only in this working copy); it is not part of the live pipeline.
+  The archive vendors its own frozen `src/` copy, and the live
+  `src/dataset_merge.py` no longer contains the union builder.
 
   `02_keyword_profile.py` is a **re-analysis of the final merged output** (it
   reads `results/Hayles_2013_OB_merged_categories.xlsx`), so despite its number
@@ -55,7 +56,7 @@ DIT-HAP/gRNA depletion-rate validation.
 ## Testing
 
 ```bash
-mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (126 tests, ~3s)
+mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (117 tests, ~3s)
 mamba run -n bioinformatics python -m pytest tests/test_growth_signals.py -v
 mamba run -n bioinformatics python -m pytest tests/test_classification.py -v
 mamba run -n bioinformatics python -m pytest tests/test_dataset_merge.py -v
@@ -76,16 +77,16 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
   `src/`, sibling to `scripts/`.
 - `src/growth_signals.py` — shared engine (`classify_growth()`); imported by
   `03`/`04` (`02` imports only its modifier groups).
-- `src/dataset_merge.py` — shared Kim 2010/Hayles 2013 loaders, the Table S3
-  parser, `collapse_duplicate_ids()`, and `build_merged_dataset()`. Imported by
-  the live `01` and the archived `01_format_and_update_ids.py`. The union's `Presence` /
-  `Dispensability_consistency` / `Dispensability_discrepancy` /
-  `Dispensability_change_class` columns are defined here.
+- `src/dataset_merge.py` — shared Kim 2010/Hayles 2013 loaders and
+  `collapse_duplicate_ids()`. Imported by the live `01`; the archived
+  `01_format_and_update_ids.py` vendors its own frozen copy under
+  `tmp/01_format_and_update_ids/src/`. The retired 25-column union is not
+  built by the live module.
 - `src/id_mapping.py` — shared PomBase ID update: `read_pombase_annotation`,
   `collect_mapping_ids`, `update_sysids`, `build_paralog_columns`,
   `combine_mapping_notes`, plus `PomBaseCol`, `build_update_maps` and
-  `normalize_sysid`. Imported by the live `01` and the archived
-  `01_format_and_update_ids.py`.
+  `normalize_sysid`. Imported by the live `01`; the archive vendors its own
+  frozen copy.
 - `src/phenotype.py` — canonical 01 column names (`Phenotype_description`,
   `Morphological_classification`, `Gene_dispensability`) and
   `format_hayles_phenotypes()`. Imported by `01`, `02`, `03`, `04` and `07`.
