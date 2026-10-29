@@ -297,6 +297,23 @@ def collect_mapping_ids(
     return ids
 
 
+def build_gene_name_map(annotation: pd.DataFrame) -> dict[str, str]:
+    """Map current systematic IDs to gene names, falling back to the ID."""
+    by_id = (
+        annotation.dropna(subset=[PomBaseCol.GENE_SYSID])
+        .drop_duplicates(PomBaseCol.GENE_SYSID)
+        .set_index(PomBaseCol.GENE_SYSID)[PomBaseCol.GENE_NAME]
+    )
+
+    name_map: dict[str, str] = {}
+    for systematic_id, gene_name in by_id.items():
+        if pd.isna(gene_name) or str(gene_name).strip() == "":
+            name_map[str(systematic_id)] = str(systematic_id)
+        else:
+            name_map[str(systematic_id)] = str(gene_name).strip()
+    return name_map
+
+
 @logger.catch
 def build_paralog_columns(
     raw_paralogs: pd.Series,
@@ -321,7 +338,7 @@ def build_paralog_columns(
             continue
         if text.lower() == "being curated":
             paralog_ids.append("being curated")
-            paralog_names.append(None)
+            paralog_names.append("being curated")
             continue
 
         ids: list[str] = []

@@ -28,7 +28,7 @@ DIT-HAP/gRNA depletion-rate validation.
   `src/id_mapping.py`, takes Kim's `Paralog` only, and writes three files: the
   Kim paralog pre-merge (`Kim2010_paralog_premerge.xlsx`, 4,913 rows), the
   Hayles pre-merge (`Hayles2013_phenotypes_premerge.xlsx`, 4,843 rows) and the
-  12-column Hayles phenotype table (`Hayles2013_phenotypes_annotated.xlsx`,
+  13-column Hayles phenotype table (`Hayles2013_phenotypes_annotated.xlsx`,
   4,843 rows). The last file feeds `03`.
 
   The old `01_format_and_update_ids.py` and its six 25-column/union outputs
@@ -47,7 +47,7 @@ DIT-HAP/gRNA depletion-rate validation.
 ## Testing
 
 ```bash
-mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (117 tests, ~3s)
+mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (118 tests, ~3s)
 mamba run -n bioinformatics python -m pytest tests/test_growth_signals.py -v
 mamba run -n bioinformatics python -m pytest tests/test_classification.py -v
 mamba run -n bioinformatics python -m pytest tests/test_dataset_merge.py -v
@@ -119,12 +119,14 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
   `Presence` = `both`, and `note` starts with `COLLAPSED`. The raw
   strain-level reconciliation still has 11 absent strains; the union has 10
   `2010_only` rows. The 4,843-row Hayles table has unique current IDs.
-- The live `01` table has 12 columns: `Systematic ID`, `Gene name`,
+- The live `01` table has 13 columns: `Systematic ID`, `Gene name`,
   `Gene product`, `Gene type`, `Hayles_ID`, `Kim_ID`, `Hayles_Note`,
   `Kim_Note`, `Phenotype_description`, `Morphological_classification`,
-  `Gene_dispensability`, `Kim_Paralog`. `Gene name`/`Gene product`/`Gene type`
-  come from PomBase; an empty `Gene name` falls back to `Systematic ID`.
-  `Kim_Paralog` comes from Kim's `Paralog` with current IDs.
+  `Gene_dispensability`, `Kim_Paralog`, `Kim_Paralog_gene_name`.
+  `Gene name`/`Gene product`/`Gene type` come from PomBase; an empty
+  `Gene name` falls back to `Systematic ID`. `Kim_Paralog` comes from Kim's
+  `Paralog` with current IDs. `Kim_Paralog_gene_name` converts those IDs to
+  current gene names; an ID without a gene name stays as the ID.
   The archived `01_format_and_update_ids.py` union has 25 columns and adds `Presence`,
   `Dispensability_consistency`/`_discrepancy`/`_change_class`, the three
   Hayles Table S3 columns, `Paralog`/`Paralog_gene_name`, the Kim 2010 calls,

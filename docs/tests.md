@@ -2,18 +2,18 @@
 
 ## Overview
 
-Seven test files, 117 tests total, all passing:
+Seven test files, 118 tests total, all passing:
 
 ```
 mamba run -n bioinformatics python -m pytest tests/ -v
-117 passed in ~3s
+118 passed in ~3s
 ```
 
 - `tests/test_growth_signals.py` — 36 tests (end-to-end classification)
 - `tests/test_classification.py` — 39 tests (Single/Multiple logic)
 - `tests/test_category_revisions.py` — 13 tests (category config loader)
 - `tests/test_dataset_merge.py` — 16 tests (loaders + raw 2010/2013 union + Kim Table S3)
-- `tests/test_id_mapping.py` — 7 tests (shared PomBase ID update, paralogs, notes)
+- `tests/test_id_mapping.py` — 8 tests (shared PomBase ID update, paralogs, names, notes)
 - `tests/test_phenotype.py` — 2 tests (shared column names + phenotype formatting)
 - `tests/test_pipeline_utils.py` — 4 tests (shared helpers)
 
@@ -246,12 +246,13 @@ test checks the actual tables.
 
 ---
 
-## `tests/test_id_mapping.py` — shared ID update (7 tests)
+## `tests/test_id_mapping.py` — shared ID update (8 tests)
 
 | Test | What it pins down |
 |---|---|
 | `test_normalize_sysid_case_and_suffix` | case normalisation; `SPAC1556.06.1` → `SPAC1556.06`; non-strings pass through |
 | `test_build_update_maps_layers` | protein-coding filter; name → ID and synonym → ID maps |
+| `test_build_gene_name_map_falls_back_to_id` | ID → gene name; a missing name falls back to the ID |
 | `test_update_sysids_all_layers` | direct match, name update, synonym update, reclassification, not found |
 | `test_collect_mapping_ids_deduplicates_main_and_paralog` | main IDs, Hayles IDs and Kim paralogs are unique and keep first-seen order |
 | `test_build_paralog_columns_updates_and_drops_self` | current IDs, current names, self-reference removal, `being curated` |

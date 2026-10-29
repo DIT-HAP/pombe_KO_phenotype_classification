@@ -12,6 +12,8 @@ Steps
 -----
 1. Load Kim's Systemic ID and Paralog columns.
 2. Update every main and Paralog ID through the current PomBase annotation.
+   Convert each Paralog ID to its current gene name; keep the ID when the
+   annotation has no gene name.
 3. Write the Kim paralog pre-merge table with mapping notes.
 4. Load Hayles' four columns and rename them to clear names.
 5. Clean the Hayles phenotype text (whitespace, trailing period, temperature
@@ -33,7 +35,8 @@ Input
 Output
 ------
 - data/1_formatted/Kim2010_paralog_premerge.xlsx:
-  Systematic ID, Kim_ID, Kim_Note, Kim_Paralog (4,913 rows).
+  Systematic ID, Kim_ID, Kim_Note, Kim_Paralog, Kim_Paralog_gene_name
+  (4,913 rows).
 - data/1_formatted/Hayles2013_phenotypes_premerge.xlsx:
   Systematic ID, Hayles_ID, Hayles_Note, Phenotype_description,
   Morphological_classification, Gene_dispensability (4,843 rows).
@@ -81,6 +84,7 @@ from dataset_merge import (  # noqa: E402
     load_kim2010,
 )
 from id_mapping import (  # noqa: E402
+    build_gene_name_map,
     build_paralog_columns,
     collect_mapping_ids,
     combine_mapping_notes,
@@ -112,6 +116,7 @@ class PhenotypeCol(StrEnum):
     KIM_NOTE = "Kim_Note"
     HAYLES_NOTE = "Hayles_Note"
     KIM_PARALOG = "Kim_Paralog"
+    KIM_PARALOG_GENE_NAME = "Kim_Paralog_gene_name"
     PHENOTYPE_DESCRIPTION = PHENOTYPE_DESC_COL
     MORPHOLOGICAL_CLASSIFICATION = MORPHOLOGY_COL
     GENE_DISPENSABILITY = DISPENSABILITY_COL
@@ -145,6 +150,7 @@ KIM_PREMERGE_COLUMNS: tuple[PhenotypeCol, ...] = (
     PhenotypeCol.KIM_ID,
     PhenotypeCol.KIM_NOTE,
     PhenotypeCol.KIM_PARALOG,
+    PhenotypeCol.KIM_PARALOG_GENE_NAME,
 )
 
 HAYLES_PREMERGE_COLUMNS: tuple[PhenotypeCol, ...] = (
@@ -169,6 +175,7 @@ FINAL_COLUMNS: tuple[PhenotypeCol, ...] = (
     PhenotypeCol.MORPHOLOGICAL_CLASSIFICATION,
     PhenotypeCol.GENE_DISPENSABILITY,
     PhenotypeCol.KIM_PARALOG,
+    PhenotypeCol.KIM_PARALOG_GENE_NAME,
 )
 
 # =============================================================================
@@ -239,6 +246,7 @@ def prepare_kim(
     kim: pd.DataFrame,
     id_map: dict[str, str],
     note_map: dict[str, str],
+    annotation: pd.DataFrame,
 ) -> pd.DataFrame:
     """Collapse duplicate Kim IDs, attach notes, and process Paralog lists."""
     kim = collapse_duplicate_ids(
@@ -249,12 +257,14 @@ def prepare_kim(
     kim[PhenotypeCol.KIM_NOTE] = kim[PhenotypeCol.KIM_ID].map(
         lambda original_ids: combine_mapping_notes(original_ids, note_map)
     )
-    kim[PhenotypeCol.KIM_PARALOG] = build_paralog_columns(
+    paralog_ids, paralog_names = build_paralog_columns(
         kim["paralogues_2010"],
         kim["id"],
         id_map,
-        name_map={},
-    )[0]
+        name_map=build_gene_name_map(annotation),
+    )
+    kim[PhenotypeCol.KIM_PARALOG] = paralog_ids
+    kim[PhenotypeCol.KIM_PARALOG_GENE_NAME] = paralog_names
     return kim
 
 
@@ -277,13 +287,14 @@ def prepare_hayles(
 
 @logger.catch
 def build_kim_premerge(kim: pd.DataFrame) -> pd.DataFrame:
-    """Kim's updated ID, original ID, note, and processed Paralog."""
+    """Kim's updated ID, original ID, note, and processed Paralog columns."""
     return kim[
         [
             "id",
             PhenotypeCol.KIM_ID,
             PhenotypeCol.KIM_NOTE,
             PhenotypeCol.KIM_PARALOG,
+            PhenotypeCol.KIM_PARALOG_GENE_NAME,
         ]
     ].rename(columns={"id": PhenotypeCol.SYSTEMATIC_ID})[
         list(KIM_PREMERGE_COLUMNS)
@@ -378,7 +389,7 @@ def build_phenotype_table(config: MergeConfig) -> MergeResult:
     """Load, map, prepare both sources, merge, and annotate."""
     kim, hayles, annotation = load_sources(config)
     kim, hayles, id_map, note_map = map_systematic_ids(kim, hayles, annotation)
-    kim = prepare_kim(kim, id_map, note_map)
+    kim = prepare_kim(kim, id_map, note_map, annotation)
     hayles = prepare_hayles(hayles, note_map)
 
     kim_premerge = build_kim_premerge(kim)

@@ -11,8 +11,8 @@
 ## 逻辑
 
 1. 读取 Kim 的 `Systemic ID` 和 `Paralog`。
-2. 用当前 PomBase 注释更新 Kim 主 ID 和 Paralog ID。
-3. 生成 Kim paralog pre-merge，带 `Kim_Note`。
+2. 用当前 PomBase 注释更新 Kim 主 ID 和 Paralog ID。把 Paralog ID 换成当前基因名；没有基因名时保留 ID。
+3. 生成 Kim paralog pre-merge，带 `Kim_Note`、`Kim_Paralog`、`Kim_Paralog_gene_name`。
 4. 读取 Hayles 的 4 列，改成清晰列名。
 5. 清洗 Hayles 表型文本：去空白、去句尾句号、把 `25, 32` / `25 32` / `32, 25` 统一为 `25,32`。
 6. 更新 Hayles ID，生成 Hayles pre-merge，带 `Hayles_Note`。
@@ -31,9 +31,9 @@
 
 | 文件 | 行数 | 列数 |
 |---|---:|---:|
-| `data/1_formatted/Kim2010_paralog_premerge.xlsx` | 4,913 | 4 |
+| `data/1_formatted/Kim2010_paralog_premerge.xlsx` | 4,913 | 5 |
 | `data/1_formatted/Hayles2013_phenotypes_premerge.xlsx` | 4,843 | 6 |
-| `data/1_formatted/Hayles2013_phenotypes_annotated.xlsx` | 4,843 | 12 |
+| `data/1_formatted/Hayles2013_phenotypes_annotated.xlsx` | 4,843 | 13 |
 
 ## 下游使用的列
 
@@ -62,6 +62,8 @@ mamba run -n bioinformatics python scripts/01_format_hayles_phenotypes.py
 
 - Kim 和 Hayles 的表型数据不合并。
 - 不使用 Hayles 的 `Paralogues` 列。
+- `Kim_Paralog` 中的 ID 已更新为当前 PomBase ID，用 `|` 分隔。
+- `Kim_Paralog_gene_name` 与 `Kim_Paralog` 一一对应。没有当前基因名时，该位置写 ID。
 - `SPAC27D7.10c` 折叠进 `SPAC27D7.09c`。`Kim_ID` 写两个 ID。
 - `SPAC823.02` 更新为 `SPAC823.17`。
 - `SPAC1556.06.1` 更新为 `SPAC1556.06`。`note` 仍是 `NO_CHANGE`（已知问题）。

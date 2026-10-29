@@ -9,6 +9,7 @@ import pytest
 
 from id_mapping import (
     PomBaseCol,
+    build_gene_name_map,
     build_paralog_columns,
     build_update_maps,
     collect_mapping_ids,
@@ -88,6 +89,20 @@ def test_update_sysids_all_layers(annotation):
     assert notes[4] == "NOT_FOUND"
 
 
+def test_build_gene_name_map_falls_back_to_id():
+    annotation = pd.DataFrame(
+        {
+            PomBaseCol.GENE_SYSID: ["SPAC1002.01c", "SPAC823.17"],
+            PomBaseCol.GENE_NAME: [None, "tom6"],
+        }
+    )
+
+    name_map = build_gene_name_map(annotation)
+
+    assert name_map["SPAC1002.01c"] == "SPAC1002.01c"
+    assert name_map["SPAC823.17"] == "tom6"
+
+
 def test_collect_mapping_ids_deduplicates_main_and_paralog():
     kim = pd.DataFrame(
         {
@@ -120,7 +135,7 @@ def test_build_paralog_columns_updates_and_drops_self():
     assert ids.iloc[1] == "being curated"
     assert pd.isna(ids.iloc[2])
     assert names.iloc[0] == "tom6"
-    assert pd.isna(names.iloc[1])
+    assert names.iloc[1] == "being curated"
     assert pd.isna(names.iloc[2])
 
 
