@@ -2,18 +2,19 @@
 
 ## Overview
 
-Eight test files, 117 tests total, all passing:
+Nine test files, 122 tests total, all passing:
 
 ```
 mamba run -n bioinformatics python -m pytest tests/ -v
-117 passed in ~3s
+122 passed in ~3s
 ```
 
 - `tests/test_growth_signals.py` — 36 tests (end-to-end classification)
-- `tests/test_classification.py` — 39 tests (Single/Multiple logic)
+- `tests/test_classification.py` — 40 tests (Single/Multiple logic + phenotype splitting)
 - `tests/test_category_revisions.py` — 13 tests (category config loader)
 - `tests/test_dataset_merge.py` — 7 tests (Kim/Hayles source loaders)
-- `tests/test_id_mapping.py` — 8 tests (shared PomBase ID update, paralogs, names, notes)
+- `tests/test_id_mapping.py` — 9 tests (shared PomBase ID update, paralogs, names, notes)
+- `tests/test_keyword_profile.py` — 3 tests (data-derived tier labels + term table)
 - `tests/test_phenotype.py` — 2 tests (shared column names + phenotype formatting)
 - `tests/test_pipeline_utils.py` — 4 tests (shared helpers)
 - `tests/test_run_pipeline.py` — 8 tests (runner selection and dry-run)
@@ -135,11 +136,12 @@ re-ranked by DIT-HAP DR median (see `04_categorize_phenotypes.py`).
 
 ---
 
-## `tests/test_classification.py` — Single/Multiple logic (39 tests)
+## `tests/test_classification.py` — Single/Multiple logic (40 tests)
 
-Tests `filter_primary_segments()`, `count_growth_segments()`, and
-`classify_phenotype_count()` — the functions that decide whether a
-description has one or multiple parallel growth phenotypes.
+Tests `filter_primary_segments()`, `count_growth_segments()`,
+`classify_phenotype_count()`, and `split_basic_additional()` — the functions
+that decide whether a description has one or multiple parallel growth
+phenotypes and split the basic phenotype from the additional text.
 
 ### `filter_primary_segments()` — which comma segments are kept?
 
@@ -238,7 +240,7 @@ loader row counts and the repaired Excel-date gene names. The retired
 
 ---
 
-## `tests/test_id_mapping.py` — shared ID update (8 tests)
+## `tests/test_id_mapping.py` — shared ID update (9 tests)
 
 | Test | What it pins down |
 |---|---|
@@ -246,6 +248,7 @@ loader row counts and the repaired Excel-date gene names. The retired
 | `test_build_update_maps_layers` | protein-coding filter; name → ID and synonym → ID maps |
 | `test_build_gene_name_map_falls_back_to_id` | ID → gene name; a missing name falls back to the ID |
 | `test_update_sysids_all_layers` | direct match, name update, synonym update, reclassification, not found |
+| `test_update_sysids_keeps_original_id_when_name_is_ambiguous` | an ambiguous gene name keeps the original ID and records `MULTIPLE_NAMES` |
 | `test_collect_mapping_ids_deduplicates_main_and_paralog` | main IDs, Hayles IDs and Kim paralogs are unique and keep first-seen order |
 | `test_build_paralog_columns_updates_and_drops_self` | current IDs, current names, self-reference removal, `being curated` |
 | `test_combine_mapping_notes_single_and_collapsed` | single note and the `COLLAPSED: ...` format |
@@ -257,6 +260,14 @@ loader row counts and the repaired Excel-date gene names. The retired
 |---|---|
 | `test_column_names` | `Phenotype_description`, `Morphological_classification`, `Gene_dispensability` |
 | `test_format_hayles_phenotypes_normalises_text` | whitespace, trailing periods, and `25, 32` / `25 32` / `32, 25` → `25,32` |
+
+## `tests/test_keyword_profile.py` — keyword-profile labels (3 tests)
+
+| Test | What it pins down |
+|---|---|
+| `test_tier_labels_from_frame_uses_categories` | `Growth_tier` → modal `Category` from the input table |
+| `test_tier_label_falls_back_for_unknown_tier` | unknown tier → `Tier N` |
+| `test_build_term_table_uses_data_derived_labels` | output columns use the derived labels |
 
 ---
 

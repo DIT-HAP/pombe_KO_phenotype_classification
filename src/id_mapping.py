@@ -188,7 +188,8 @@ def update_sysids(
         if gene_str in names2id.index:
             result = names2id.loc[gene_str]
             if isinstance(result, pd.Series):
-                updated_ids.append(np.nan)
+                # Keep the original ID rather than dropping the row.
+                updated_ids.append(gene_str)
                 notes.append(f"MULTIPLE_NAMES: {result.tolist()}")
                 logger.warning(
                     f"Gene name {gene_str!r} maps to multiple SysIDs: "
@@ -204,7 +205,8 @@ def update_sysids(
         if gene_str in synonyms2id.index:
             result = synonyms2id.loc[gene_str]
             if isinstance(result, pd.Series):
-                updated_ids.append(np.nan)
+                # Keep the original ID rather than dropping the row.
+                updated_ids.append(gene_str)
                 notes.append(f"MULTIPLE_SYNONYMS: {result.tolist()}")
                 logger.warning(
                     f"Synonym {gene_str!r} maps to multiple SysIDs: "

@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib
 
 import numpy as np
+import pandas as pd
 from growth_signals import (
     filter_primary_segments,
     count_growth_segments,
@@ -20,7 +21,9 @@ from growth_signals import (
 
 # 03_group_genes.py has a numeric filename, so it cannot be a normal import.
 # conftest.py puts scripts/ on sys.path, so import_module resolves it.
-classify_phenotype_count = importlib.import_module("03_group_genes").classify_phenotype_count
+group_genes = importlib.import_module("03_group_genes")
+classify_phenotype_count = group_genes.classify_phenotype_count
+split_basic_additional = group_genes.split_basic_additional
 
 
 # ===========================================================================
@@ -233,6 +236,20 @@ class TestClassifyPhenotypeCount:
         cat, tier = classify_growth(filtered)
         assert cat == "WT-like"
         assert tier == 5
+
+
+class TestSplitBasicAdditional:
+    def test_removes_only_the_at_suffix(self):
+        split = split_basic_additional(
+            pd.Series(
+                ["VIABLE mutant at 25,32", "VIABLE elongated at 25,32"]
+            ),
+            " 25,32",
+        )
+        assert split["Basic phenotype"].tolist() == [
+            "VIABLE mutant",
+            "VIABLE elongated",
+        ]
 
 
 # ── Sanity check: our hard-coded lists ──────────────────────────────────────────

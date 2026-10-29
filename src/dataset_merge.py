@@ -136,7 +136,7 @@ def load_kim2010(path: Path) -> pd.DataFrame:
 
 def _load_kim_full(df: pd.DataFrame, path: Path) -> pd.DataFrame:
     """Canonicalize Kim 2010 full Supplementary Table 1."""
-    required = [KIM_ID, "Constructed?", KIM_DELETION, KIM_ANALYSIS]
+    required = [KIM_ID, "Constructed?", KIM_DELETION, KIM_ANALYSIS, "Paralog"]
     missing = [c for c in required if c not in df.columns]
     if missing:
         raise ValueError(f"{path}: missing columns {missing}")
@@ -158,7 +158,7 @@ def _load_kim_full(df: pd.DataFrame, path: Path) -> pd.DataFrame:
             "gene_product_2010": clean_text_column(
                 optional_column(df, "Gene function")
             ),
-            "paralogues_2010": clean_text_column(optional_column(df, "Paralog")),
+            "paralogues_2010": clean_text_column(df["Paralog"]),
             "sc_orthologue_2010": clean_text_column(
                 optional_column(df, "Sc ortholog")
             ),

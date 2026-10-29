@@ -126,7 +126,7 @@ def split_basic_additional(desc_series: pd.Series, marker: str) -> pd.DataFrame:
     """
     parts = desc_series.str.split(marker, expand=True)
 
-    basic = parts[0].str.rstrip(" at")
+    basic = parts[0].str.removesuffix(" at").str.strip()
     additional = parts[1].str.lstrip(", ").str.strip() if parts.shape[1] > 1 else pd.Series([None] * len(parts))
 
     return pd.DataFrame({"Basic phenotype": basic, "Additional phenotype": additional})
@@ -264,7 +264,6 @@ def main() -> int:
         # Sheet 4: Inconsistent phenotypes (drop split columns)
         inconsistent_df = df[df["Phenotype_count"] == "Temp_mismatch"].drop(
             columns=["Basic phenotype", "Additional phenotype"],
-            errors="ignore",
         )
         inconsistent_df.to_excel(writer, sheet_name="Inconsistent phenotypes", index=False)
 

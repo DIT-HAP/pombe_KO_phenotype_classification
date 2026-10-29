@@ -89,6 +89,25 @@ def test_update_sysids_all_layers(annotation):
     assert notes[4] == "NOT_FOUND"
 
 
+def test_update_sysids_keeps_original_id_when_name_is_ambiguous():
+    annotation = pd.DataFrame(
+        {
+            PomBaseCol.GENE_SYSID: ["SPAC1002.01c", "SPAC823.17"],
+            PomBaseCol.GENE_NAME: ["dup", "dup"],
+            PomBaseCol.GENE_TYPE: [
+                "protein coding gene",
+                "protein coding gene",
+            ],
+            PomBaseCol.SYNONYMS: [None, None],
+        }
+    )
+
+    updated, notes = update_sysids(["dup"], annotation)
+
+    assert updated == ["dup"]
+    assert notes[0].startswith("MULTIPLE_NAMES")
+
+
 def test_build_gene_name_map_falls_back_to_id():
     annotation = pd.DataFrame(
         {

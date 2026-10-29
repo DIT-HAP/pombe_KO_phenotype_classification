@@ -2,11 +2,15 @@
 Growth-tier Keyword Profile Analysis
 =====================================
 
-For each Growth_tier (1–5), extracts and categorises words from the
-phenotype descriptions — growth signal words, morphological words,
-modifier words — and reports their frequency.  This helps validate
-whether descriptions assigned to the same tier share similar
-vocabulary, and whether tiers are genuinely distinct.
+For each Growth_tier, extracts and categorises words from the phenotype
+descriptions — growth signal words, morphological words, modifier words —
+and reports their frequency.  This helps validate whether descriptions
+assigned to the same tier share similar vocabulary, and whether tiers are
+genuinely distinct.
+
+Tier labels are derived from the input table's ``Category`` column, so the
+column names follow the current DR-ranked categories instead of a hardcoded
+1–5 mapping.
 
 The output is an inspection table, not a word cloud.  Each row is a
 word; columns show its frequency per Growth_tier, allowing quick
@@ -196,6 +200,7 @@ IGNORED: set[str] = set(ALL_STEMS) | set(PHRASE_PATTERNS.values())
 # When reading from the final Excel, the description column name
 DESC_COL = PHENOTYPE_DESC_COL
 TIER_COL = "Growth_tier"
+CATEGORY_COL = "Category"
 
 # =============================================================================
 # LOGGING SETUP
@@ -223,15 +228,20 @@ def tokenise(text: str) -> list[str]:
     return [tok.strip(".,;:!?'") for tok in re.split(r"[,\s;:()]+", t) if tok.strip(".,;:!?'")]
 
 
-def tier_label(tier: int) -> str:
-    """Human-readable tier name."""
-    return {
-        1: "Spores",
-        2: "Germinated",
-        3: "Microcolonies",
-        4: "Small colonies",
-        5: "WT-like",
-    }.get(tier, f"Tier {tier}")
+def tier_labels_from_frame(df: pd.DataFrame) -> dict[int, str]:
+    """Map each Growth_tier to its category in the input table."""
+    labels: dict[int, str] = {}
+    for tier, categories in df.groupby(TIER_COL)[CATEGORY_COL]:
+        mode = categories.mode()
+        labels[int(tier)] = (
+            str(mode.iloc[0]) if not mode.empty else f"Tier {tier}"
+        )
+    return labels
+
+
+def tier_label(tier: int, labels: dict[int, str]) -> str:
+    """Human-readable tier name, derived from the input table."""
+    return labels.get(int(tier), f"Tier {tier}")
 
 
 def _classify_word(word: str) -> str:
@@ -292,6 +302,7 @@ def build_term_table(
     term_category: str | None = None,
     selected_terms: set[str] | None = None,
     top_n: int | None = 50,
+    tier_labels: dict[int, str] | None = None,
 ) -> pd.DataFrame:
     """Build a DataFrame: rows = terms, columns = tier frequencies."""
     rows: list[dict] = []
@@ -317,7 +328,9 @@ def build_term_table(
     )
 
     # Rename columns to human-readable
-    pivot.columns = [f"Tier_{c}_{tier_label(c)}" for c in pivot.columns]
+    pivot.columns = [
+        f"Tier_{c}_{tier_label(c, tier_labels or {})}" for c in pivot.columns
+    ]
 
     # Add category column (before the numeric columns) — do this BEFORE
     # renaming the index so the classifier sees the hyphenated tokens.
@@ -377,6 +390,7 @@ def main() -> int:
     logger.info(f"Loading classifications: {input_path}")
     df = pd.read_excel(input_path)
     logger.info(f"Loaded {len(df):,} genes, {df[TIER_COL].nunique()} tiers")
+    tier_labels = tier_labels_from_frame(df)
 
     # ------------------------------------------------------------------
     # 2. Tokenise per tier
@@ -389,7 +403,7 @@ def main() -> int:
             counter.update(tokenise(text))
         tier_word_counts[tier] = counter
         logger.debug(
-            f"  Tier {tier} ({tier_label(tier)}): "
+            f"  Tier {tier} ({tier_label(tier, tier_labels)}): "
             f"{len(texts):,} genes, {len(counter):,} unique words",
         )
 
@@ -399,7 +413,9 @@ def main() -> int:
 
     # 3a — All words (full list with category labels)
     logger.info("Building vocabulary tables …")
-    total_vocab = build_term_table(tier_word_counts, "all", top_n=None)
+    total_vocab = build_term_table(
+        tier_word_counts, "all", top_n=None, tier_labels=tier_labels,
+    )
     total_vocab.index.name = "word"
 
     # 3b — Growth signals only
@@ -408,6 +424,7 @@ def main() -> int:
         "growth",
         selected_terms=GROWTH_SIGNAL_WORDS,
         top_n=50,
+        tier_labels=tier_labels,
     )
     if not growth_table.empty:
         growth_table.index.name = "word"
@@ -418,20 +435,29 @@ def main() -> int:
         "morphology",
         selected_terms=MORPHOLOGY_WORDS,
         top_n=80,
+        tier_labels=tier_labels,
     )
     if not morph_table.empty:
         morph_table.index.name = "word"
 
     # 3d — Viability words
     viability_table = build_term_table(
-        tier_word_counts, "viability", selected_terms=VIABILITY_WORDS, top_n=30,
+        tier_word_counts,
+        "viability",
+        selected_terms=VIABILITY_WORDS,
+        top_n=30,
+        tier_labels=tier_labels,
     )
     if not viability_table.empty:
         viability_table.index.name = "word"
 
     # 3e — Process words
     process_table = build_term_table(
-        tier_word_counts, "process", selected_terms=PROCESS_WORDS, top_n=30,
+        tier_word_counts,
+        "process",
+        selected_terms=PROCESS_WORDS,
+        top_n=30,
+        tier_labels=tier_labels,
     )
     if not process_table.empty:
         process_table.index.name = "word"
@@ -442,6 +468,7 @@ def main() -> int:
         "modifiers",
         selected_terms=MOD_FREQ_WORDS | MOD_DEGREE_WORDS | MOD_QUANT_WORDS,
         top_n=80,
+        tier_labels=tier_labels,
     )
     if not mod_table.empty:
         mod_table.index.name = "word"
@@ -486,6 +513,7 @@ def main() -> int:
             "other",
             selected_terms=other_terms,
             top_n=50,
+            tier_labels=tier_labels,
         )
         if not other_table.empty:
             other_table.index.name = "word"

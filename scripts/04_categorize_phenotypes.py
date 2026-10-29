@@ -120,9 +120,6 @@ def rerank_growth_tier_by_dr(df: pd.DataFrame, dit_hap_path: Path) -> pd.DataFra
     DR is sign-flipped (more negative = more depleted), so the lowest median
     becomes tier 1.
     """
-    if not dit_hap_path.exists():
-        logger.warning(f"DIT-HAP file not found: {dit_hap_path}, keeping signal-based tiers")
-        return df
     cat_dr_median = category_dr_medians(df, load_dit_hap(dit_hap_path))
     tier_map = {cat: i + 1 for i, cat in enumerate(cat_dr_median.index)}
     df["Growth_tier"] = df["Category"].map(tier_map).fillna(len(tier_map) + 1).astype(int)
