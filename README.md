@@ -172,7 +172,7 @@ Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx` and
 
 ## Test suite
 
-122 tests covering signal detection, modifier handling, segment filtering,
+124 tests covering signal detection, modifier handling, segment filtering,
 Single/Multiple classification, the Kim-2010/Hayles-2013 loaders, and the
 shared ID-mapping and phenotype-formatting modules:
 

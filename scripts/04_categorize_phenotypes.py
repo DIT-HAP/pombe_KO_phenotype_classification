@@ -74,7 +74,7 @@ from phenotype import (
     MORPHOLOGY_COL,
     PHENOTYPE_DESC_COL,
 )
-from pipeline_utils import category_dr_medians, load_dit_hap, setup_logger
+from pipeline_utils import dr_tier_map, load_dit_hap, setup_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -120,9 +120,12 @@ def rerank_growth_tier_by_dr(df: pd.DataFrame, dit_hap_path: Path) -> pd.DataFra
     DR is sign-flipped (more negative = more depleted), so the lowest median
     becomes tier 1.
     """
-    cat_dr_median = category_dr_medians(df, load_dit_hap(dit_hap_path))
-    tier_map = {cat: i + 1 for i, cat in enumerate(cat_dr_median.index)}
-    df["Growth_tier"] = df["Category"].map(tier_map).fillna(len(tier_map) + 1).astype(int)
+    tier_map, _ = dr_tier_map(df, load_dit_hap(dit_hap_path))
+    df["Growth_tier"] = (
+        df["Category"].map(tier_map)
+        .fillna(len(tier_map) + 1)
+        .astype(int)
+    )
     logger.info(f"  Growth_tier re-ranked by DR median ({len(tier_map)} categories)")
     return df
 
@@ -172,15 +175,7 @@ def classify_inconsistent_phenotype(
 
 def build_pivot(df: pd.DataFrame, row_col: str, col_col: str) -> pd.DataFrame:
     """Build a pivot table counting rows by two categorical columns."""
-    return (
-        df[[row_col, col_col]]
-        .value_counts()
-        .rename("Count")
-        .reset_index()
-        .pivot(index=row_col, columns=col_col, values="Count")
-        .fillna(0)
-        .astype(int)
-    )
+    return pd.crosstab(df[row_col], df[col_col])
 
 
 # =============================================================================

@@ -41,7 +41,7 @@ Usage
     from category_revisions import load_category_config
 
     config = load_category_config()
-    category = config.revisions.get(sub_category, sub_category)
+    category = config.apply(sub_category)
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-09-15
@@ -75,6 +75,10 @@ class CategoryConfig:
     sub_category_order: list[str]
     revisions: dict[str, str]
     category_order: list[str]
+
+    def apply(self, sub_category: str) -> str:
+        """Return the merged Category for a Sub_category."""
+        return self.revisions.get(sub_category, sub_category)
 
 
 # =============================================================================

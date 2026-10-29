@@ -2,21 +2,21 @@
 
 ## Overview
 
-Nine test files, 122 tests total, all passing:
+Nine test files, 124 tests total, all passing:
 
 ```
 mamba run -n bioinformatics python -m pytest tests/ -v
-122 passed in ~3s
+124 passed in ~3s
 ```
 
 - `tests/test_growth_signals.py` — 36 tests (end-to-end classification)
 - `tests/test_classification.py` — 40 tests (Single/Multiple logic + phenotype splitting)
-- `tests/test_category_revisions.py` — 13 tests (category config loader)
+- `tests/test_category_revisions.py` — 14 tests (category config loader + merge application)
 - `tests/test_dataset_merge.py` — 7 tests (Kim/Hayles source loaders)
 - `tests/test_id_mapping.py` — 9 tests (shared PomBase ID update, paralogs, names, notes)
 - `tests/test_keyword_profile.py` — 3 tests (data-derived tier labels + term table)
 - `tests/test_phenotype.py` — 2 tests (shared column names + phenotype formatting)
-- `tests/test_pipeline_utils.py` — 4 tests (shared helpers)
+- `tests/test_pipeline_utils.py` — 5 tests (shared metric loading + DR tier map)
 - `tests/test_run_pipeline.py` — 8 tests (runner selection and dry-run)
 
 The archived `01_format_and_update_ids.py` integration test (17 tests) lives with its script in
@@ -201,7 +201,7 @@ phenotypes and split the basic phenotype from the additional text.
 
 ---
 
-## `tests/test_category_revisions.py` — category config loader (13 tests)
+## `tests/test_category_revisions.py` — category config loader (14 tests)
 
 Tests `load_category_config()` from `src/category_revisions.py`, the shared
 loader for the category JSON (`sub_category_order` / `revisions` /
@@ -215,6 +215,7 @@ loader for the category JSON (`sub_category_order` / `revisions` /
 | Category order | exact list; includes merge target `divided` (regression) |
 | Identity entries are not revisions | `spores` in order but not in revisions |
 | Spot checks | e.g. `germinated and divided` → `divided` |
+| `apply()` | known sub-category merges; unknown keeps itself |
 | No chained merges | a merge target is not itself merged |
 | Missing file | raises `FileNotFoundError` |
 | Non-object JSON | raises `ValueError` |

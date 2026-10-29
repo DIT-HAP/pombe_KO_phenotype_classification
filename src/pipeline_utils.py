@@ -67,14 +67,22 @@ def setup_logger(log_level: str = "INFO") -> None:
 # =============================================================================
 
 
+def _load_metric(path: Path, value_col: str, sign: int = 1) -> pd.DataFrame:
+    """Load one metric by systematic ID, dropping missing values."""
+    df = pd.read_csv(path, sep="\t")
+    df = df[["Systematic ID", value_col]].dropna(subset=[value_col]).copy()
+    if sign != 1:
+        df[value_col] = sign * df[value_col]
+    return df
+
+
 def load_dit_hap(path: Path) -> pd.DataFrame:
     """Load DIT-HAP values, keeping systematic IDs with a non-null DR.
 
     ``DR`` is sign-flipped (negative = depleted); the source file already
     stores the flipped values, so no negation happens here.
     """
-    df = pd.read_csv(path, sep="\t")
-    return df[["Systematic ID", "DR"]].dropna(subset=["DR"]).copy()
+    return _load_metric(path, "DR")
 
 
 def category_dr_medians(
@@ -91,13 +99,21 @@ def category_dr_medians(
     return joined.groupby(category_col)["DR"].median().sort_values(ascending=True)
 
 
+def dr_tier_map(
+    df: pd.DataFrame,
+    dit_hap: pd.DataFrame,
+    category_col: str = "Category",
+) -> tuple[dict[str, int], pd.Series]:
+    """Return Category -> DR tier (1 = most depleted) and the DR medians."""
+    medians = category_dr_medians(df, dit_hap, category_col=category_col)
+    tier_map = {cat: i + 1 for i, cat in enumerate(medians.index)}
+    return tier_map, medians
+
+
 def load_grna(path: Path) -> pd.DataFrame:
     """Load gRNA values, keeping systematic IDs with a non-null um.
 
     The source ``um`` is a positive depletion rate; it is negated on load so
     that, like the DIT-HAP DR, more negative means more depleted.
     """
-    df = pd.read_csv(path, sep="\t")
-    df = df[["Systematic ID", "um"]].dropna(subset=["um"]).copy()
-    df["um"] = -df["um"]
-    return df
+    return _load_metric(path, "um", sign=-1)

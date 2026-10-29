@@ -58,7 +58,7 @@ if str(SRC_DIR) not in sys.path:
 
 # 5. Local Imports
 from category_revisions import DEFAULT_CONFIG, load_category_config
-from pipeline_utils import category_dr_medians, load_dit_hap, setup_logger
+from pipeline_utils import dr_tier_map, load_dit_hap, setup_logger
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -121,19 +121,18 @@ def apply_category_merge(
     merged = merged.rename(columns={"Category": "Sub_category"})
 
     # 2. Load revision mapping: Sub_category → merged Category
-    rev_map = load_category_config(revisions_path).revisions
+    config = load_category_config(revisions_path)
 
-    # 3. Apply: if sub-category is in rev_map, use revised; else keep it
-    merged["Category"] = merged["Sub_category"].map(rev_map).fillna(merged["Sub_category"])
+    # 3. Apply: if sub-category is in the mapping, use revised; else keep it
+    merged["Category"] = merged["Sub_category"].map(config.apply)
 
-    logger.info(f"  {len(rev_map)} sub-categories revised, "
+    logger.info(f"  {len(config.revisions)} sub-categories revised, "
                 f"{merged['Category'].nunique()} merged categories")
 
     # 4. Compute median DR per merged Category (1 = most depleted)
-    cat_dr_median = category_dr_medians(merged, load_dit_hap(dit_hap_path))
+    tier_map, cat_dr_median = dr_tier_map(merged, load_dit_hap(dit_hap_path))
     logger.info(f"  DR medians computed for {len(cat_dr_median)} categories")
 
-    tier_map = {cat: i + 1 for i, cat in enumerate(cat_dr_median.index)}
     merged["Growth_tier"] = merged["Category"].map(tier_map)
 
     # Log the ranking
@@ -146,38 +145,17 @@ def apply_category_merge(
 def build_summaries(df: pd.DataFrame) -> dict[str, pd.DataFrame]:
     """Build summary sheets for the output workbook."""
     summaries: dict[str, pd.DataFrame] = {}
-
-    summaries["Consistency_25_32"] = (
-        df.value_counts("Consistency_25_32")
-        .rename("Count")
-        .to_frame()
-    )
-
-    summaries["Phenotype_count"] = (
-        df.value_counts("Phenotype_count")
-        .rename("Count")
-        .to_frame()
-    )
-
-    summaries["Category"] = (
-        df.value_counts("Category")
-        .rename("Count")
-        .to_frame()
-    )
-
-    summaries["Sub_category"] = (
-        df.value_counts("Sub_category")
-        .rename("Count")
-        .to_frame()
-    )
-
-    summaries["Growth_tier"] = (
-        df.value_counts("Growth_tier")
-        .sort_index()
-        .rename("Count")
-        .to_frame()
-    )
-
+    for column in (
+        "Consistency_25_32",
+        "Phenotype_count",
+        "Category",
+        "Sub_category",
+        "Growth_tier",
+    ):
+        counts = df.value_counts(column)
+        if column == "Growth_tier":
+            counts = counts.sort_index()
+        summaries[column] = counts.rename("Count").to_frame()
     return summaries
 
 

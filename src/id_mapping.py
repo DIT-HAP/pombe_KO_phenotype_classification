@@ -262,6 +262,16 @@ def update_sysids(
 # =============================================================================
 
 
+def _split_paralog_tokens(value: object) -> list[str]:
+    """Split Kim's pipe-separated Paralog field, dropping field sentinels."""
+    if pd.isna(value):
+        return []
+    text = str(value).strip()
+    if not text or text.lower() in {"none", "being curated"}:
+        return []
+    return [token.strip() for token in text.split("|") if token.strip()]
+
+
 def collect_mapping_ids(
     kim2010: pd.DataFrame,
     hayles2013: pd.DataFrame,
@@ -284,10 +294,7 @@ def collect_mapping_ids(
     for value in hayles2013["id"]:
         add(value)
     for value in kim2010["paralogues_2010"].dropna():
-        text = str(value).strip()
-        if text.lower() in {"none", "being curated"}:
-            continue
-        for token in text.split("|"):
+        for token in _split_paralog_tokens(value):
             add(token)
 
     logger.info(f"Collected {len(ids):,} unique IDs (main + paralog) for mapping")
@@ -328,21 +335,20 @@ def build_paralog_columns(
             continue
 
         text = str(raw).strip()
-        if not text or text.lower() == "none":
-            paralog_ids.append(None)
-            paralog_names.append(None)
-            continue
         if text.lower() == "being curated":
             paralog_ids.append("being curated")
             paralog_names.append("being curated")
             continue
 
+        tokens = _split_paralog_tokens(text)
+        if not tokens:
+            paralog_ids.append(None)
+            paralog_names.append(None)
+            continue
+
         ids: list[str] = []
         names: list[str] = []
-        for token in text.split("|"):
-            token = token.strip()
-            if not token:
-                continue
+        for token in tokens:
             new_id = id_map.get(token, token)
             if pd.isna(new_id):
                 new_id = token

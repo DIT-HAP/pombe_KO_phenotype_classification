@@ -8,7 +8,12 @@ from __future__ import annotations
 
 import pandas as pd
 
-from pipeline_utils import category_dr_medians, load_dit_hap, load_grna
+from pipeline_utils import (
+    category_dr_medians,
+    dr_tier_map,
+    load_dit_hap,
+    load_grna,
+)
 
 
 def test_category_dr_medians_sorted_most_depleted_first():
@@ -44,6 +49,26 @@ def test_category_dr_medians_tier_one_is_most_negative():
     tier_map = {cat: i + 1 for i, cat in enumerate(medians.index)}
 
     assert tier_map == {"X": 1, "Y": 2}
+
+
+def test_dr_tier_map_orders_categories():
+    df = pd.DataFrame(
+        {
+            "Systematic ID": ["a", "b", "c"],
+            "Category": ["X", "Y", "Z"],
+        }
+    )
+    dit_hap = pd.DataFrame(
+        {
+            "Systematic ID": ["a", "b", "c"],
+            "DR": [-2.0, 0.5, -1.0],
+        }
+    )
+
+    tier_map, medians = dr_tier_map(df, dit_hap)
+
+    assert tier_map == {"X": 1, "Z": 2, "Y": 3}
+    assert list(medians.index) == ["X", "Z", "Y"]
 
 
 def test_load_dit_hap_drops_null_dr(tmp_path):

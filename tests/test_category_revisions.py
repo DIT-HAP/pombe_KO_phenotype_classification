@@ -44,6 +44,12 @@ def test_loads_config():
     assert len(config.category_order) == 7
 
 
+def test_apply_merges_and_keeps_unknown():
+    config = load_category_config(CONFIG)
+    assert config.apply("spores, some germinated") == "germinated"
+    assert config.apply("spores") == "spores"
+
+
 def test_sub_category_order_bounds():
     config = load_category_config(CONFIG)
     assert config.sub_category_order[0] == "spores"

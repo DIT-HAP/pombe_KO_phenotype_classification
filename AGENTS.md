@@ -56,7 +56,7 @@ DIT-HAP/gRNA depletion-rate validation.
 ## Testing
 
 ```bash
-mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (122 tests, ~3s)
+mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (124 tests, ~3s)
 mamba run -n bioinformatics python -m pytest tests/test_growth_signals.py -v
 mamba run -n bioinformatics python -m pytest tests/test_classification.py -v
 mamba run -n bioinformatics python -m pytest tests/test_dataset_merge.py -v

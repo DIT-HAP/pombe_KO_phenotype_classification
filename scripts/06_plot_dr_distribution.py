@@ -695,7 +695,7 @@ def build_original_spec(
 ) -> FigureSpec:
     """Build the fine-grained Sub_category figure spec grouped by revised category."""
     working = merged.rename(columns={SUB_CATEGORY_COL: ROW_COL}).assign(
-        **{GROUP_COL: lambda df: df[ROW_COL].map(lambda sub: config.revisions.get(sub, sub))}
+        **{GROUP_COL: lambda df: df[ROW_COL].map(config.apply)}
     )
     panels = [
         Panel(
