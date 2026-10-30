@@ -336,43 +336,36 @@ def merge_tables(
 
 
 def add_annotation(merged: pd.DataFrame, annotation: pd.DataFrame) -> pd.DataFrame:
-    """Add current PomBase gene name, product, and type by updated systematic ID."""
+    """Add current PomBase gene name, product, and type by updated systematic ID.
+
+    A direct systematic ID wins; a Hayles ID that is only a current PomBase
+    synonym (for example ``SPBC8E4.02c``) resolves through the synonym table.
+    """
     by_id = annotation.drop_duplicates("gene_systematic_id").set_index(
         "gene_systematic_id"
     )
+    synonyms = (
+        annotation[["gene_systematic_id", "synonyms"]]
+        .dropna(subset=["synonyms"])
+        .assign(synonym=lambda df: df["synonyms"].str.split(","))
+        .explode("synonym")
+    )
+    synonym_to_id = (
+        synonyms.assign(synonym=lambda df: df["synonym"].str.strip())
+        .loc[lambda df: df["synonym"].ne("")]
+        .drop_duplicates("synonym")
+        .set_index("synonym")["gene_systematic_id"]
+    )
 
-    synonym_index: dict[str, int] = {}
-    for row_index, synonyms in annotation["synonyms"].dropna().items():
-        for token in str(synonyms).split(","):
-            token = token.strip()
-            if token and token not in synonym_index:
-                synonym_index[token] = row_index
-
-    gene_names: list[str] = []
-    gene_products: list[object] = []
-    gene_types: list[object] = []
-    for systematic_id in merged[PhenotypeCol.SYSTEMATIC_ID]:
-        if systematic_id in by_id.index:
-            row = by_id.loc[systematic_id]
-        elif systematic_id in synonym_index:
-            row = annotation.loc[synonym_index[systematic_id]]
-        else:
-            gene_names.append(systematic_id)
-            gene_products.append(None)
-            gene_types.append(None)
-            continue
-
-        gene_name = row["gene_name"]
-        if pd.isna(gene_name) or str(gene_name).strip() == "":
-            gene_name = systematic_id
-        gene_names.append(str(gene_name))
-        gene_products.append(row["gene_product"])
-        gene_types.append(row["gene_type"])
+    ids = merged[PhenotypeCol.SYSTEMATIC_ID]
+    canonical = ids.where(ids.isin(by_id.index), ids.map(synonym_to_id))
+    gene_name = canonical.map(by_id["gene_name"]).astype("string").str.strip()
+    gene_name = gene_name.mask(gene_name.isna() | gene_name.eq(""), ids)
 
     annotated = merged.copy()
-    annotated[PhenotypeCol.GENE_NAME] = gene_names
-    annotated[PhenotypeCol.GENE_PRODUCT] = gene_products
-    annotated[PhenotypeCol.GENE_TYPE] = gene_types
+    annotated[PhenotypeCol.GENE_NAME] = gene_name
+    annotated[PhenotypeCol.GENE_PRODUCT] = canonical.map(by_id["gene_product"])
+    annotated[PhenotypeCol.GENE_TYPE] = canonical.map(by_id["gene_type"])
     return annotated
 
 

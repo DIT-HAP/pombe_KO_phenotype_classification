@@ -49,14 +49,14 @@ DIT-HAP/gRNA depletion-rate validation.
   reads `results/Hayles_2013_OB_merged_categories.xlsx`), so despite its number
   it runs *after* `05`, not before `03`. `06_plot_dr_distribution.py` and
   `07_plot_dr_distribution_pure.py` also run after `05`.
-- `05` writes the merged table to both `data/5_merged_categories/` and a
-  committed copy in `results/`. `06`/`07` write each figure as both PNG and
-  PDF to `results/`.
+- `05` writes the six-sheet workbook to `data/5_merged_categories/` and a
+  flat single-sheet copy of `All genes` to `results/`. `06`/`07` write each
+  figure as both PNG and PDF to `results/`.
 
 ## Testing
 
 ```bash
-mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (127 tests, ~3s)
+mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (128 tests)
 mamba run -n bioinformatics python -m pytest tests/test_growth_signals.py -v
 mamba run -n bioinformatics python -m pytest tests/test_classification.py -v
 mamba run -n bioinformatics python -m pytest tests/test_dataset_merge.py -v
@@ -78,10 +78,12 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
 - `src/growth_signals.py` — shared engine (`classify_growth()`); imported by
   `03`/`04` (`02` imports only its modifier groups).
 - `src/dataset_merge.py` — shared Kim 2010/Hayles 2013 loaders and
-  `collapse_duplicate_ids()`. Imported by the live `01`; the archived
-  `01_format_and_update_ids.py` vendors its own frozen copy under
-  `tmp/01_format_and_update_ids/src/`. The retired 25-column union is not
-  built by the live module.
+  `collapse_duplicate_ids()`. The live loaders return only what `01`
+  consumes: Kim `id`/`paralogues_2010`, Hayles `id`/`hayles2013_study`/
+  `phenotype_description`/`phenotype_classification`. Imported by the live
+  `01`; the archived `01_format_and_update_ids.py` vendors its own frozen
+  copy under `tmp/01_format_and_update_ids/src/`. The retired 25-column
+  union is not built by the live module.
 - `src/id_mapping.py` — shared PomBase ID update: `read_pombase_annotation`,
   `collect_mapping_ids`, `update_sysids`, `build_paralog_columns`,
   `combine_mapping_notes`, plus `PomBaseCol`, `build_update_maps` and
@@ -152,9 +154,9 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
     the live `01` and the archived `01_format_and_update_ids.py`)
   - `kim2010/kim2010_supp_table3.tsv` (Kim Table S3: 40 literature
     disagreements + judgment criteria; hand-transcribed because the table is
-    only published in the supplementary PDF. Tracked via a `.gitignore`
-    exception, so it *is* in the repo. Used only by the archived
-    `01_format_and_update_ids.py`)
+    only published in the supplementary PDF. Gitignored and local-only like
+    the rest of `data/references/`; the archive carries its own copy. Used
+    only by the archived `01_format_and_update_ids.py`)
   - `hayles2013/hayles2013_supp_table3.xlsx` (Hayles 2013 main table; the
     live `01` and the archived `01_format_and_update_ids.py`)
   - `hayles2013/hayles2013_supp.docx` (Hayles Table S3; used only by the

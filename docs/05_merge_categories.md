@@ -34,7 +34,7 @@ data/raw/                                Sign-flipped DIT-HAP DR for tier rankin
 data/5_merged_categories/                Final merged table + summaries
   Hayles_2013_OB_merged_categories.xlsx
                              ↓
-results/                                 Copy for source control
+results/                                 Flat copy of All genes
   Hayles_2013_OB_merged_categories.xlsx
 ```
 
@@ -77,7 +77,8 @@ Key columns:
 
 ### `results/Hayles_2013_OB_merged_categories.xlsx`
 
-Identical copy, saved to the version-controlled `results/` directory.
+Flat single-sheet copy of the `All genes` sheet, saved to the
+version-controlled `results/` directory.
 
 ---
 

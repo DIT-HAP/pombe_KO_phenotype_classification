@@ -107,8 +107,10 @@ genes have a V/E published call: **1,163 agree** with Kim's own deletion
 call, **40 disagree**, and 6 have no Kim deletion call. The 40 disagreements
 are listed in **Kim Supplementary Table 3**, which is only published inside
 the supplementary PDF; it is hand-transcribed into
-`data/references/kim2010/kim2010_supp_table3.tsv` (tracked in git) and
-checked against Table S1 at runtime by `validate_kim_table_s3()`.
+`data/references/kim2010/kim2010_supp_table3.tsv` (gitignored/local-only,
+like the rest of `data/references/`; the archive carries its own copy) and
+checked against Table S1 at runtime by the archived loader's
+`validate_kim_table_s3()`.
 
 The stated criteria for the 40 disagreements:
 
@@ -367,7 +369,8 @@ The whole-table "differs from both" count adds the 13 Table S3 changes to the
 
 ## 6. Data-quality issues that affect merges
 
-The most important pitfalls, all handled by the loader or recorded here:
+The most important pitfalls, all handled by the loader that reads the
+affected field or recorded here:
 
 1. **Call encoding.** Use `V`/`E` consistently; the loader also accepts
    `viable`/`essential` defensively. Strip stray whitespace before comparing.
@@ -376,12 +379,15 @@ The most important pitfalls, all handled by the loader or recorded here:
    that appear in 2013 are the Table S2 additions.
 3. **Whitespace.** The 2013 table has stray whitespace in 9
    `Gene dispensability. This study` values (renamed
-   `Hayles2013_Gene_dispensability` in the output), 58 phenotype classifications,
-   170 phenotype descriptions, 4 gene-product descriptions, 1 paralogue
-   field, and 1 cell-length value. Kim's table also has a few trailing spaces
-   in primer/gene-function fields.
+   `Hayles2013_Gene_dispensability` in the output), 58 phenotype
+   classifications and 170 phenotype descriptions; the live loader strips
+   those three columns. The archived loader additionally strips 4
+   gene-product descriptions, 1 paralogue field and 1 cell-length value.
+   Kim's table also has a few trailing spaces in primer/gene-function fields;
+   the live loader reads only Systemic ID and Paralog.
 4. **Excel date corruption in gene names.** Three 2013 `Gene name` cells are
-   stored as dates (`mmm-yy` format). `load_hayles2013()` reconstructs them:
+   stored as dates (`mmm-yy` format). The live loader no longer reads
+   `Gene name`; the archived loader's `load_hayles2013()` reconstructs them:
    - `SPAC1F3.10c` → `2001-10-01` → `Oct-1` (`oct1`)
    - `SPAC5D6.05` → `2011-09-01` → `Sep-11` (`med18`, synonyms
      `pmc6`, `sep11`)

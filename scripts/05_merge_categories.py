@@ -25,7 +25,8 @@ Output
 - ``data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx``
   Single merged table + summary sheets (Category, Sub_category,
   Consistency_25_32, Phenotype_count, Growth_tier).
-- ``results/Hayles_2013_OB_merged_categories.xlsx`` (copy for source control)
+- ``results/Hayles_2013_OB_merged_categories.xlsx`` (flat single-sheet copy
+  of ``All genes`` for source control)
 
 Usage
 -----

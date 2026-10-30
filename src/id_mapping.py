@@ -277,25 +277,20 @@ def collect_mapping_ids(
     hayles2013: pd.DataFrame,
 ) -> list[str]:
     """Collect unique main-table and Kim-paralog IDs before the ID update."""
-    seen: set[str] = set()
-    ids: list[str] = []
-
-    def add(value: object) -> None:
-        if pd.isna(value):
-            return
-        text = str(value).strip()
-        if not text or text in seen:
-            return
-        seen.add(text)
-        ids.append(text)
-
-    for value in kim2010["id"]:
-        add(value)
-    for value in hayles2013["id"]:
-        add(value)
-    for value in kim2010["paralogues_2010"].dropna():
-        for token in _split_paralog_tokens(value):
-            add(token)
+    main_ids = pd.concat([kim2010["id"], hayles2013["id"]], ignore_index=True)
+    paralog_ids = (
+        kim2010["paralogues_2010"]
+        .dropna()
+        .map(_split_paralog_tokens)
+        .explode()
+    )
+    ids = (
+        pd.concat([main_ids, paralog_ids], ignore_index=True)
+        .dropna()
+        .astype(str)
+        .str.strip()
+    )
+    ids = ids[ids.ne("")].drop_duplicates().tolist()
 
     logger.info(f"Collected {len(ids):,} unique IDs (main + paralog) for mapping")
     return ids

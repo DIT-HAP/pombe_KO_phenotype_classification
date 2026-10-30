@@ -1,5 +1,7 @@
 tmp/
 references/
+!data/references/
+data/references/*
 # Keep the hand-curated manual-check file tracked (see data/references/)
 !data/references/previous_manual_check_of_insistent_phenotypes/
 data/references/previous_manual_check_of_insistent_phenotypes/*

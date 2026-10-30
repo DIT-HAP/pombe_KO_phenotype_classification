@@ -161,7 +161,9 @@ Scripts run in this order:
 8. **07_plot_dr_distribution_pure.py** — the same cnsplots layout restricted to five
    pure categories (spores, germinated, microcolonies, small colonies, WT-like)
 
-Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx` and
+Final output lands in `data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx`
+(the six-sheet workbook), a flat single-sheet copy of `All genes` in
+`results/Hayles_2013_OB_merged_categories.xlsx`, and
 `results/DR_um_distribution_*.{png,pdf}`.
 
 ## Key concepts
@@ -173,7 +175,7 @@ Final output lands in `results/Hayles_2013_OB_merged_categories.xlsx` and
 
 ## Test suite
 
-127 tests covering signal detection, modifier handling, segment filtering,
+128 tests covering signal detection, modifier handling, segment filtering,
 Single/Multiple classification, the Kim-2010/Hayles-2013 loaders, and the
 shared ID-mapping and phenotype-formatting modules:
 

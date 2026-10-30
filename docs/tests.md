@@ -2,19 +2,20 @@
 
 ## Overview
 
-Ten test files, 127 tests total, all passing:
+Eleven test files, 128 tests total, all passing:
 
 ```
 mamba run -n bioinformatics python -m pytest tests/ -v
-127 passed in ~5s
+128 passed
 ```
 
 - `tests/test_growth_signals.py` — 36 tests (end-to-end classification)
 - `tests/test_classification.py` — 40 tests (Single/Multiple logic + phenotype splitting)
 - `tests/test_category_revisions.py` — 14 tests (category config loader + merge application)
-- `tests/test_dataset_merge.py` — 7 tests (Kim/Hayles source loaders)
+- `tests/test_dataset_merge.py` — 3 tests (Kim/Hayles source loaders)
 - `tests/test_dr_plotting.py` — 3 tests (shared DR/um plotting helpers)
-- `tests/test_id_mapping.py` — 9 tests (shared PomBase ID update, paralogs, names, notes)
+- `tests/test_format_hayles_phenotypes.py` — 3 tests (annotation join)
+- `tests/test_id_mapping.py` — 11 tests (shared PomBase ID update, paralogs, names, notes)
 - `tests/test_keyword_profile.py` — 3 tests (data-derived tier labels + term table)
 - `tests/test_phenotype.py` — 2 tests (shared column names + phenotype formatting)
 - `tests/test_pipeline_utils.py` — 5 tests (shared metric loading + DR tier map)
@@ -227,22 +228,31 @@ loader for the category JSON (`sub_category_order` / `revisions` /
 
 ---
 
-## `tests/test_dataset_merge.py` — source loaders (7 tests)
+## `tests/test_dataset_merge.py` — source loaders (3 tests)
 
 Normalisation tests pin the input parsing; one real-data test checks the
-loader row counts and the repaired Excel-date gene names. The retired
-25-column union and Table S3 parsers are no longer in the live module.
+loader row counts and the slim live contract. The retired 25-column union
+and Table S3 parsers are no longer in the live module.
 
 | Test | What it pins down |
 |---|---|
 | `test_normalize_id_strips_all_whitespace` | whitespace removal and missing-value handling |
 | `test_normalize_call_maps_words_and_stray_spaces` | `viable`/`essential` and stray spaces → `V`/`E` |
-| `test_reconstruct_gene_name_from_date` | Excel date cells → `Oct-1`, `Sep-11`, `Sep-1` |
-| `test_real_inputs_load_expected_rows` | real tables: 4,914 Kim rows, 4,836 constructed, 4,843 Hayles rows, and the three repaired Excel-date names |
+| `test_real_inputs_load_expected_rows` | real tables: 4,914 Kim rows and 4,843 Hayles rows; Kim returns `id`/`paralogues_2010`, Hayles returns the four live columns |
 
 ---
 
-## `tests/test_id_mapping.py` — shared ID update (9 tests)
+## `tests/test_format_hayles_phenotypes.py` — annotation join (3 tests)
+
+| Test | What it pins down |
+|---|---|
+| `test_add_annotation_direct_and_synonym_fallback` | direct IDs and a synonym-only ID resolve to name/product/type |
+| `test_add_annotation_prefers_direct_id_over_synonym` | a direct systematic ID wins over a synonym of another gene |
+| `test_add_annotation_falls_back_to_id_for_blank_name_and_missing_id` | blank names fall back to the ID; unresolved IDs stay as-is with missing product/type |
+
+---
+
+## `tests/test_id_mapping.py` — shared ID update (11 tests)
 
 | Test | What it pins down |
 |---|---|
@@ -252,6 +262,8 @@ loader row counts and the repaired Excel-date gene names. The retired
 | `test_update_sysids_all_layers` | direct match, name update, synonym update, reclassification, not found |
 | `test_update_sysids_keeps_original_id_when_name_is_ambiguous` | an ambiguous gene name keeps the original ID and records `MULTIPLE_NAMES` |
 | `test_collect_mapping_ids_deduplicates_main_and_paralog` | main IDs, Hayles IDs and Kim paralogs are unique and keep first-seen order |
+| `test_collect_mapping_ids_handles_missing_and_sentinels` | `None`/`pd.NA`/blank IDs and `none`/`being curated`/empty pipe fields are dropped |
+| `test_collect_mapping_ids_preserves_case_sensitive_order` | IDs differing only by case stay distinct and first-seen order is kept |
 | `test_build_paralog_columns_updates_and_drops_self` | current IDs, current names, self-reference removal, `being curated` |
 | `test_combine_mapping_notes_single_and_collapsed` | single note and the `COLLAPSED: ...` format |
 | `test_read_pombase_annotation_strips_whitespace` | TSV loading and whitespace stripping |
@@ -296,7 +308,7 @@ mamba run -n bioinformatics python -m pytest tests/test_classification.py -v
 # Revision mapping loader only
 mamba run -n bioinformatics python -m pytest tests/test_category_revisions.py -v
 
-# 2010/2013 union table only
+# Kim/Hayles source loaders only
 mamba run -n bioinformatics python -m pytest tests/test_dataset_merge.py -v
 
 # Shared ID mapping only

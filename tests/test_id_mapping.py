@@ -142,6 +142,35 @@ def test_collect_mapping_ids_deduplicates_main_and_paralog():
     ]
 
 
+def test_collect_mapping_ids_handles_missing_and_sentinels():
+    kim = pd.DataFrame(
+        {
+            "id": [None, " A ", "B", pd.NA],
+            "paralogues_2010": [
+                None,
+                "none",
+                "being curated",
+                " P1 | P2 | | ",
+            ],
+        }
+    )
+    hayles = pd.DataFrame({"id": ["B", "C"]})
+
+    assert collect_mapping_ids(kim, hayles) == ["A", "B", "C", "P1", "P2"]
+
+
+def test_collect_mapping_ids_preserves_case_sensitive_order():
+    kim = pd.DataFrame(
+        {
+            "id": ["A", "a", "A"],
+            "paralogues_2010": ["none", "none", "none"],
+        }
+    )
+    hayles = pd.DataFrame({"id": ["A", "a"]})
+
+    assert collect_mapping_ids(kim, hayles) == ["A", "a"]
+
+
 def test_build_paralog_columns_updates_and_drops_self():
     raw = pd.Series(["SPAC823.02|SPAC1002.01C", "being curated", None])
     main_ids = pd.Series(["SPAC1002.01c", "SPAC823.17", "SPCC622.17"])

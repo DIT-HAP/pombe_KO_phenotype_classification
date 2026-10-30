@@ -37,7 +37,8 @@ Output
       (diploidising, suppressors, revertants, stationary, etc.)
     - ``Modifiers`` — frequency, degree, and quantity words
       (occasionally, often, slightly, some, many, once, …)
-    - ``Other words`` — remaining words not in any category above
+    - ``Other words`` — words whose exact token or stem is not in the
+      ignore sets; inflected forms of category words can still appear
 
 Usage
 -----
@@ -85,7 +86,9 @@ DEFAULT_OUTPUT = Path("data/2_keyword_profile/growth_tier_keyword_profile.xlsx")
 
 # ——— Word categories ——————————————————————————————————————————————————————————
 
-# 1. Canonical growth-signal words (from growth_signals.py)
+# 1. Growth-stage vocabulary for this profile. It is broader than
+# growth_signals.py: it also counts "germination" and colony variants that
+# the classifier intentionally does not treat as growth signals.
 GROWTH_SIGNAL_WORDS = {
     "spores", "spore", "germinated", "germinate", "germination",
     "microcolonies", "microcolony",
@@ -299,7 +302,6 @@ def _classify_word(word: str) -> str:
 
 def build_term_table(
     term_counts: dict[int, Counter],
-    term_category: str | None = None,
     selected_terms: set[str] | None = None,
     top_n: int | None = 50,
     tier_labels: dict[int, str] | None = None,
@@ -414,14 +416,13 @@ def main() -> int:
     # 3a — All words (full list with category labels)
     logger.info("Building vocabulary tables …")
     total_vocab = build_term_table(
-        tier_word_counts, "all", top_n=None, tier_labels=tier_labels,
+        tier_word_counts, top_n=None, tier_labels=tier_labels,
     )
     total_vocab.index.name = "word"
 
     # 3b — Growth signals only
     growth_table = build_term_table(
         tier_word_counts,
-        "growth",
         selected_terms=GROWTH_SIGNAL_WORDS,
         top_n=50,
         tier_labels=tier_labels,
@@ -432,7 +433,6 @@ def main() -> int:
     # 3c — Morphology words only
     morph_table = build_term_table(
         tier_word_counts,
-        "morphology",
         selected_terms=MORPHOLOGY_WORDS,
         top_n=80,
         tier_labels=tier_labels,
@@ -443,7 +443,6 @@ def main() -> int:
     # 3d — Viability words
     viability_table = build_term_table(
         tier_word_counts,
-        "viability",
         selected_terms=VIABILITY_WORDS,
         top_n=30,
         tier_labels=tier_labels,
@@ -454,7 +453,6 @@ def main() -> int:
     # 3e — Process words
     process_table = build_term_table(
         tier_word_counts,
-        "process",
         selected_terms=PROCESS_WORDS,
         top_n=30,
         tier_labels=tier_labels,
@@ -465,7 +463,6 @@ def main() -> int:
     # 3f — Modifier words (all sub‑categories combined)
     mod_table = build_term_table(
         tier_word_counts,
-        "modifiers",
         selected_terms=MOD_FREQ_WORDS | MOD_DEGREE_WORDS | MOD_QUANT_WORDS,
         top_n=80,
         tier_labels=tier_labels,
@@ -503,14 +500,14 @@ def main() -> int:
         if not mod_table.empty:
             mod_table.to_excel(writer, sheet_name="Modifiers")
 
-        # Bonus — all OTHER words not in any category (potential discovery)
+        # Bonus — words whose exact token or stem is not in the ignore sets
+        # (potential discovery). Inflected forms of category words can remain.
         other_terms: set[str] = set()
         for counter in tier_word_counts.values():
             other_terms.update(counter.keys())
         other_terms -= IGNORED
         other_table = build_term_table(
             tier_word_counts,
-            "other",
             selected_terms=other_terms,
             top_n=50,
             tier_labels=tier_labels,
