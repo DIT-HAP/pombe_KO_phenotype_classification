@@ -60,16 +60,16 @@ Version:  2.0.0
 # =============================================================================
 # 1. Standard Library Imports
 import argparse
-import sys
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+import sys
 
-# 2. Data Processing Imports
-import pandas as pd
-
-# 3. Third-party Imports
+# 2. Third-party Imports
 from loguru import logger
+
+# 3. Data Processing Imports
+import pandas as pd
 
 # 4. Project Path Setup
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -84,6 +84,7 @@ from dataset_merge import (  # noqa: E402
     load_kim2010,
 )
 from id_mapping import (  # noqa: E402
+    PomBaseCol,
     build_gene_name_map,
     build_paralog_columns,
     collect_mapping_ids,
@@ -95,6 +96,9 @@ from phenotype import (  # noqa: E402
     DISPENSABILITY_COL,
     MORPHOLOGY_COL,
     PHENOTYPE_DESC_COL,
+    RAW_DISPENSABILITY_COL,
+    RAW_MORPHOLOGY_COL,
+    RAW_PHENOTYPE_DESC_COL,
     format_hayles_phenotypes,
 )
 from pipeline_utils import setup_logger  # noqa: E402
@@ -124,26 +128,17 @@ class PhenotypeCol(StrEnum):
 
 PROJECT_ROOT = SCRIPT_DIR.parent
 
-DEFAULT_KIM_PATH = (
-    PROJECT_ROOT / "data/references/kim2010/kim2010_supp_table1.xls"
-)
-DEFAULT_HAYLES_PATH = (
-    PROJECT_ROOT / "data/references/hayles2013/hayles2013_supp_table3.xlsx"
-)
+DEFAULT_KIM_PATH = PROJECT_ROOT / "data/references/kim2010/kim2010_supp_table1.xls"
+DEFAULT_HAYLES_PATH = PROJECT_ROOT / "data/references/hayles2013/hayles2013_supp_table3.xlsx"
 DEFAULT_ANNOTATION_PATH = (
-    PROJECT_ROOT
-    / "data/references/pombase-2026-06-01_gene_IDs_names_products.tsv"
+    PROJECT_ROOT / "data/references/pombase-2026-06-01_gene_IDs_names_products.tsv"
 )
 
-DEFAULT_KIM_PREMERGE_OUTPUT = (
-    PROJECT_ROOT / "data/1_formatted/Kim2010_paralog_premerge.xlsx"
-)
+DEFAULT_KIM_PREMERGE_OUTPUT = PROJECT_ROOT / "data/1_formatted/Kim2010_paralog_premerge.xlsx"
 DEFAULT_HAYLES_PREMERGE_OUTPUT = (
     PROJECT_ROOT / "data/1_formatted/Hayles2013_phenotypes_premerge.xlsx"
 )
-DEFAULT_OUTPUT = (
-    PROJECT_ROOT / "data/1_formatted/Hayles2013_phenotypes_annotated.xlsx"
-)
+DEFAULT_OUTPUT = PROJECT_ROOT / "data/1_formatted/Hayles2013_phenotypes_annotated.xlsx"
 
 KIM_PREMERGE_COLUMNS: tuple[PhenotypeCol, ...] = (
     PhenotypeCol.SYSTEMATIC_ID,
@@ -183,7 +178,7 @@ FINAL_COLUMNS: tuple[PhenotypeCol, ...] = (
 # =============================================================================
 
 
-@dataclass(kw_only=True, slots=True, frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class MergeConfig:
     """Runtime paths for the Hayles 2013 phenotype table."""
 
@@ -195,7 +190,7 @@ class MergeConfig:
     output_path: Path
 
 
-@dataclass(kw_only=True, slots=True, frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class MergeResult:
     """The two pre-merge tables and the merged output."""
 
@@ -227,15 +222,15 @@ def map_systematic_ids(
     """Update both ID columns and keep the pre-update IDs and notes."""
     mapping_ids = collect_mapping_ids(kim, hayles)
     mapped_ids, notes = update_sysids(mapping_ids, annotation)
-    id_map = dict(zip(mapping_ids, mapped_ids))
-    note_map = dict(zip(mapping_ids, notes))
+    id_map = dict(zip(mapping_ids, mapped_ids, strict=True))
+    note_map = dict(zip(mapping_ids, notes, strict=True))
 
     kim = kim.copy()
     hayles = hayles.copy()
     kim[PhenotypeCol.KIM_ID] = kim["id"]
     hayles[PhenotypeCol.HAYLES_ID] = hayles["id"]
-    kim["id"] = kim["id"].map(lambda value: id_map.get(value, value))
-    hayles["id"] = hayles["id"].map(lambda value: id_map.get(value, value))
+    kim["id"] = kim["id"].map(id_map)
+    hayles["id"] = hayles["id"].map(id_map)
     return kim, hayles, id_map, note_map
 
 
@@ -291,9 +286,7 @@ def build_kim_premerge(kim: pd.DataFrame) -> pd.DataFrame:
             PhenotypeCol.KIM_PARALOG,
             PhenotypeCol.KIM_PARALOG_GENE_NAME,
         ]
-    ].rename(columns={"id": PhenotypeCol.SYSTEMATIC_ID})[
-        list(KIM_PREMERGE_COLUMNS)
-    ]
+    ].rename(columns={"id": PhenotypeCol.SYSTEMATIC_ID})[list(KIM_PREMERGE_COLUMNS)]
 
 
 def build_hayles_premerge(hayles: pd.DataFrame) -> pd.DataFrame:
@@ -303,16 +296,16 @@ def build_hayles_premerge(hayles: pd.DataFrame) -> pd.DataFrame:
             "id",
             PhenotypeCol.HAYLES_ID,
             PhenotypeCol.HAYLES_NOTE,
-            "phenotype_description",
-            "phenotype_classification",
-            "hayles2013_study",
+            RAW_PHENOTYPE_DESC_COL,
+            RAW_MORPHOLOGY_COL,
+            RAW_DISPENSABILITY_COL,
         ]
     ].rename(
         columns={
             "id": PhenotypeCol.SYSTEMATIC_ID,
-            "phenotype_description": PhenotypeCol.PHENOTYPE_DESCRIPTION,
-            "phenotype_classification": PhenotypeCol.MORPHOLOGICAL_CLASSIFICATION,
-            "hayles2013_study": PhenotypeCol.GENE_DISPENSABILITY,
+            RAW_PHENOTYPE_DESC_COL: PhenotypeCol.PHENOTYPE_DESCRIPTION,
+            RAW_MORPHOLOGY_COL: PhenotypeCol.MORPHOLOGICAL_CLASSIFICATION,
+            RAW_DISPENSABILITY_COL: PhenotypeCol.GENE_DISPENSABILITY,
         }
     )[list(HAYLES_PREMERGE_COLUMNS)]
 
@@ -331,8 +324,7 @@ def merge_tables(
     missing = int(merged[PhenotypeCol.KIM_ID].isna().sum())
     if missing:
         logger.warning(f"{missing:,} Hayles rows have no Kim ID match")
-    merged = merged.sort_values(PhenotypeCol.SYSTEMATIC_ID).reset_index(drop=True)
-    return merged
+    return merged.sort_values(PhenotypeCol.SYSTEMATIC_ID).reset_index(drop=True)
 
 
 def add_annotation(merged: pd.DataFrame, annotation: pd.DataFrame) -> pd.DataFrame:
@@ -341,31 +333,29 @@ def add_annotation(merged: pd.DataFrame, annotation: pd.DataFrame) -> pd.DataFra
     A direct systematic ID wins; a Hayles ID that is only a current PomBase
     synonym (for example ``SPBC8E4.02c``) resolves through the synonym table.
     """
-    by_id = annotation.drop_duplicates("gene_systematic_id").set_index(
-        "gene_systematic_id"
-    )
+    by_id = annotation.drop_duplicates(PomBaseCol.GENE_SYSID).set_index(PomBaseCol.GENE_SYSID)
     synonyms = (
-        annotation[["gene_systematic_id", "synonyms"]]
-        .dropna(subset=["synonyms"])
-        .assign(synonym=lambda df: df["synonyms"].str.split(","))
+        annotation[[PomBaseCol.GENE_SYSID, PomBaseCol.SYNONYMS]]
+        .dropna(subset=[PomBaseCol.SYNONYMS])
+        .assign(synonym=lambda df: df[PomBaseCol.SYNONYMS].str.split(","))
         .explode("synonym")
     )
     synonym_to_id = (
         synonyms.assign(synonym=lambda df: df["synonym"].str.strip())
         .loc[lambda df: df["synonym"].ne("")]
         .drop_duplicates("synonym")
-        .set_index("synonym")["gene_systematic_id"]
+        .set_index("synonym")[PomBaseCol.GENE_SYSID]
     )
 
     ids = merged[PhenotypeCol.SYSTEMATIC_ID]
     canonical = ids.where(ids.isin(by_id.index), ids.map(synonym_to_id))
-    gene_name = canonical.map(by_id["gene_name"]).astype("string").str.strip()
+    gene_name = canonical.map(by_id[PomBaseCol.GENE_NAME]).astype("string").str.strip()
     gene_name = gene_name.mask(gene_name.isna() | gene_name.eq(""), ids)
 
     annotated = merged.copy()
     annotated[PhenotypeCol.GENE_NAME] = gene_name
-    annotated[PhenotypeCol.GENE_PRODUCT] = canonical.map(by_id["gene_product"])
-    annotated[PhenotypeCol.GENE_TYPE] = canonical.map(by_id["gene_type"])
+    annotated[PhenotypeCol.GENE_PRODUCT] = canonical.map(by_id[PomBaseCol.GENE_PRODUCT])
+    annotated[PhenotypeCol.GENE_TYPE] = canonical.map(by_id[PomBaseCol.GENE_TYPE])
     return annotated
 
 
@@ -385,10 +375,7 @@ def build_phenotype_table(config: MergeConfig) -> MergeResult:
     logger.info(f"Kim paralog pre-merge: {len(kim_premerge):,} rows")
     logger.info(f"Hayles pre-merge: {len(hayles_premerge):,} rows")
     logger.info(f"Hayles phenotype table: {len(merged):,} rows")
-    logger.info(
-        f"Hayles rows without Kim ID: "
-        f"{merged[PhenotypeCol.KIM_ID].isna().sum():,}"
-    )
+    logger.info(f"Hayles rows without Kim ID: {merged[PhenotypeCol.KIM_ID].isna().sum():,}")
     return MergeResult(
         kim_premerge=kim_premerge,
         hayles_premerge=hayles_premerge,
@@ -422,28 +409,19 @@ def parse_args() -> argparse.Namespace:
         "--annotation",
         type=Path,
         default=DEFAULT_ANNOTATION_PATH,
-        help=(
-            "PomBase annotation TSV "
-            f"(default: {DEFAULT_ANNOTATION_PATH})"
-        ),
+        help=(f"PomBase annotation TSV (default: {DEFAULT_ANNOTATION_PATH})"),
     )
     parser.add_argument(
         "--kim-premerge-output",
         type=Path,
         default=DEFAULT_KIM_PREMERGE_OUTPUT,
-        help=(
-            "Kim paralog pre-merge workbook "
-            f"(default: {DEFAULT_KIM_PREMERGE_OUTPUT})"
-        ),
+        help=(f"Kim paralog pre-merge workbook (default: {DEFAULT_KIM_PREMERGE_OUTPUT})"),
     )
     parser.add_argument(
         "--hayles-premerge-output",
         type=Path,
         default=DEFAULT_HAYLES_PREMERGE_OUTPUT,
-        help=(
-            "Hayles pre-merge workbook "
-            f"(default: {DEFAULT_HAYLES_PREMERGE_OUTPUT})"
-        ),
+        help=(f"Hayles pre-merge workbook (default: {DEFAULT_HAYLES_PREMERGE_OUTPUT})"),
     )
     parser.add_argument(
         "--output",
