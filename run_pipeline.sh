@@ -447,6 +447,8 @@ check_step_inputs() {
                 "fitted DIT-HAP parameters (data/raw/)" || missing=1
             require_file "$step" "$GRNA" \
                 "fitted gRNA parameters (data/raw/)" || missing=1
+            require_file "$step" "$CATEGORY_REVISIONS" \
+                "hand-curated category orders and merges (tracked in git)" || missing=1
             ;;
     esac
 
@@ -543,6 +545,7 @@ run_step() {
             args=(--merged "$MERGED"
                   --dit-hap "$DIT_HAP"
                   --grna "$GRNA"
+                  --revisions "$CATEGORY_REVISIONS"
                   --output-dir "$RESULTS_DIR")
             ;;
         *)

@@ -56,10 +56,10 @@ Input
 
 Output
 ------
-- ``results/DR_um_distribution_original.{png,pdf}`` — 2421 x 1825 px
-- ``results/DR_um_distribution_revised.{png,pdf}`` — 1817 x 594 px
+- ``results/DR_um_distribution_original.{png,pdf}`` — 2621 x 1825 px
+- ``results/DR_um_distribution_revised.{png,pdf}`` — 2017 x 594 px
 
-Each violin axes is 100 px wide at the 288 dpi savefig default (25 pt); height
+Each violin axes is 200 px wide at the 288 dpi savefig default (50 pt); height
 grows with the row count. Text keeps ``cnsplots``' default sizes. Width, unlike
 height, is content-tight: the export crops to the drawn extent, so the row
 labels and the stats table set the final canvas width.
@@ -138,6 +138,7 @@ from dr_plotting import (  # noqa: E402
     adjacent_pairs,
     annotate_pairs,
     build_long_frame,
+    category_color_map,
     draw_stats_panel,
     log_category_stats,
     log_pvalues,
@@ -160,15 +161,17 @@ mpl.use("Agg")
 CATEGORY_COL = "Category"
 REQUIRED_COLUMNS: tuple[str, ...] = (ID_COL, SUB_CATEGORY_COL, CATEGORY_COL)
 
-# Panel geometry. The violin axes are 100 px wide in the 288 dpi export
-# (PANEL_WIDTH_PT = 25 pt); height grows with the number of rows. Text keeps
+# Panel geometry. The violin axes are 200 px wide in the 288 dpi export
+# (PANEL_WIDTH_PT = 50 pt); height grows with the number of rows. Text keeps
 # cnsplots' default sizes, so a row only has to clear one 7 pt tick label.
 ORIGINAL_ROW_HEIGHT_PT = 14.2
 REVISED_ROW_HEIGHT_PT = 16.89
 
-# P-value bracket colours for this script's figures.
-PVALUE_SIGNIFICANT_COLOR = "red"
-PVALUE_NEUTRAL_COLOR = "0.45"
+# Cell journal qualitative palette. Each merged category takes the slot its
+# canonical category order fixes, so a category keeps one colour in every figure.
+PALETTE = [mcolors.to_hex(tuple(color)) for color in cns.palettes("Cell")]
+PVALUE_SIGNIFICANT_COLOR = PALETTE[0]
+PVALUE_NEUTRAL_COLOR = PALETTE[9]
 
 
 # =============================================================================
@@ -188,17 +191,6 @@ def build_group_order(frames: list[pd.DataFrame], category_order: list[str]) -> 
     present = set().union(*(set(frame[GROUP_COL]) for frame in frames))
     ordered = [cat for cat in category_order if cat in present]
     return ordered + sorted(present - set(ordered))
-
-
-def build_group_colors(group_order: list[str]) -> dict[str, str]:
-    """Map each merged category to a colour from the cnsplots qualitative palette."""
-    palette = [mcolors.to_hex(tuple(color)) for color in cns.palettes(cns.settings.palette_qual)]
-    if len(group_order) > len(palette):
-        logger.warning(
-            f"{len(group_order)} groups exceed the {len(palette)}-colour cnsplots "
-            f"palette '{cns.settings.palette_qual}'; colours repeat."
-        )
-    return {group: palette[i % len(palette)] for i, group in enumerate(group_order)}
 
 
 def build_sub_category_rows(
@@ -532,7 +524,7 @@ def main() -> int:
 
         all_frames = [panel.frame for spec in specs for panel in spec.panels]
         group_order = build_group_order(all_frames, config.category_order)
-        colors = build_group_colors(group_order)
+        colors = category_color_map(group_order, PALETTE, config.category_order)
         logger.info(f"  {len(group_order)} merged categories: {', '.join(group_order)}")
 
         for spec in specs:

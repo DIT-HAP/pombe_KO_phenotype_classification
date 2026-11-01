@@ -24,6 +24,7 @@ Version:  1.0.0
 # IMPORTS
 # =============================================================================
 # 1. Standard Library Imports
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from itertools import pairwise
 from pathlib import Path
@@ -60,9 +61,9 @@ ROW_COL = "Row label"
 GROUP_COL = "Merged category"
 
 # Shared panel geometry in points (1/72 inch).
-# 25 pt is 100 px in the 288 dpi export (1 pt = 4 px), the target width of one
+# 50 pt is 200 px in the 288 dpi export (1 pt = 4 px), the target width of one
 # violin axes area. Height is set per figure from the row count.
-PANEL_WIDTH_PT = 25
+PANEL_WIDTH_PT = 50
 PAD_LEFT_PT = 12
 PAD_TOP_PT = 12
 MARGIN_RIGHT_PT = 32
@@ -257,6 +258,24 @@ def log_pvalues(pairs: list[tuple[str, str]], panels: list[Panel]) -> None:
             logger.info(
                 f"    {first:<32} vs {second:<32} p={pair_pvalue(panel.frame, first, second):.3e}"
             )
+
+
+# =============================================================================
+# COLOURS
+# =============================================================================
+
+
+def category_color_map(
+    categories: Iterable[str],
+    palette: Sequence[str],
+    category_order: Sequence[str],
+) -> dict[str, str]:
+    """Map each category to the palette slot its configured order fixes."""
+    categories = list(categories)
+    order = list(category_order)
+    order += sorted(set(categories) - set(order))
+    slots = {category: index for index, category in enumerate(order)}
+    return {category: palette[slots[category] % len(palette)] for category in categories}
 
 
 # =============================================================================

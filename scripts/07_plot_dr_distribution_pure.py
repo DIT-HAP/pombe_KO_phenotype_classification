@@ -21,14 +21,15 @@ Rows, in draw order:
 Every adjacent pair is annotated with a two-sided Mann-Whitney U p-value
 (raw, no multiple-comparison correction — the same choice as step 06).
 The bracket column, label format and row layout match the revised cnsplots
-figure. Each violin axes is 100 px wide at the 288 dpi export (25 pt); height
+figure. Each violin axes is 200 px wide at the 288 dpi export (50 pt); height
 grows with the row count and text keeps cnsplots' default sizes. Colours come
 from the Cell journal qualitative palette: significant
 p-values (p < 0.05) in the palette terracotta and the rest in the palette
-grey. The five row colours are the first five Cell colours in draw order,
-which keeps them maximally distinct. Both violin panels repeat the row
-labels, each with that panel's own sample size in parentheses on the same
-line, e.g. ``spores (n = 143)``.
+grey. Rows take the slot their category holds in the category config's
+``category_order`` — the same mapping as step 06 — so a category keeps one
+colour across all three figures. Both violin panels repeat the row labels,
+each with that panel's own sample size in parentheses on the same line,
+e.g. ``spores (n = 143)``.
 
 Input
 -----
@@ -39,6 +40,8 @@ Input
   — ``Systematic ID`` and sign-flipped ``DR`` (negative = depleted).
 - ``data/raw/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv``
   — ``Systematic ID`` and ``um`` (negated on load).
+- ``data/4_categorized_genes/category_revisions.json``
+  — ``category_order`` fixes each row's colour slot.
 
 Output
 ------
@@ -82,6 +85,10 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 # 5. Local Imports
+from category_revisions import (  # noqa: E402
+    DEFAULT_CONFIG,
+    load_category_config,
+)
 from dr_plotting import (  # noqa: E402
     CANVAS_SLACK_PT,
     DEFAULT_DIT_HAP,
@@ -109,6 +116,7 @@ from dr_plotting import (  # noqa: E402
     adjacent_pairs,
     annotate_pairs,
     build_long_frame,
+    category_color_map,
     draw_stats_panel,
     log_category_stats,
     log_pvalues,
@@ -129,14 +137,14 @@ mpl.use("Agg")
 # GLOBAL CONSTANTS & ENUMS
 # =============================================================================
 
-# Cell journal qualitative palette. The five rows take the first five colours
-# in draw order, which keeps adjacent rows maximally distinct.
+# Cell journal qualitative palette. Each row takes the slot its category holds
+# in the canonical category order, so a category keeps one colour in every figure.
 PALETTE = [mcolors.to_hex(tuple(color)) for color in cns.palettes("Cell")]
 PVALUE_SIGNIFICANT_COLOR = PALETTE[0]
 PVALUE_NEUTRAL_COLOR = PALETTE[9]
 
-# Panel geometry. The violin axes are 100 px wide in the 288 dpi export
-# (PANEL_WIDTH_PT = 25 pt); height grows with the number of rows. Text keeps
+# Panel geometry. The violin axes are 200 px wide in the 288 dpi export
+# (PANEL_WIDTH_PT = 50 pt); height grows with the number of rows. Text keeps
 # cnsplots' default sizes, so a row only has to clear one 7 pt tick label.
 ROW_HEIGHT_PT = 16.89
 
@@ -205,13 +213,10 @@ def select_pure_rows(merged: pd.DataFrame) -> pd.DataFrame:
     return selected
 
 
-def build_row_colors() -> dict[str, str]:
-    """Assign the first Cell-palette colours to the rows in draw order."""
-    if len(PURE_ROWS) > len(PALETTE):
-        logger.warning(
-            f"{len(PURE_ROWS)} rows exceed the {len(PALETTE)}-colour Cell palette; colours repeat."
-        )
-    return {row.label: PALETTE[index % len(PALETTE)] for index, row in enumerate(PURE_ROWS)}
+def build_row_colors(category_order: list[str]) -> dict[str, str]:
+    """Assign each row the Cell colour its category's canonical slot fixes."""
+    colors = category_color_map((row.sub_category for row in PURE_ROWS), PALETTE, category_order)
+    return {row.label: colors[row.sub_category] for row in PURE_ROWS}
 
 
 def row_tick_labels(order: list[str], frame: pd.DataFrame) -> list[str]:
@@ -358,6 +363,12 @@ def parse_args() -> argparse.Namespace:
         "--grna", type=Path, default=DEFAULT_GRNA, help=f"gRNA TSV (default: {DEFAULT_GRNA})"
     )
     parser.add_argument(
+        "--revisions",
+        type=Path,
+        default=DEFAULT_CONFIG,
+        help=f"Category config JSON (default: {DEFAULT_CONFIG})",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=DEFAULT_OUTPUT_DIR,
@@ -423,7 +434,8 @@ def main() -> int:
         grna = load_grna(args.grna)
         logger.info(f"  {len(dit_hap)} genes with DR, {len(grna)} genes with um")
 
-        colors = build_row_colors()
+        config = load_category_config(args.revisions)
+        colors = build_row_colors(config.category_order)
         spec = build_spec(selected, dit_hap, grna, args.output_dir)
         logger.info(f"=== {spec.name} figure — {len(spec.row_order)} rows ===")
         log_category_stats(spec.row_order, spec.panels)
