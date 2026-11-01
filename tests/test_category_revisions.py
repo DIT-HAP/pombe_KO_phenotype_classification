@@ -34,7 +34,7 @@ EXPECTED_REVISIONS = {
 
 
 def test_default_path_points_at_json():
-    assert DEFAULT_CONFIG == Path("data/4_categorized_genes/category_revisions.json")
+    assert Path("data/4_categorized_genes/category_revisions.json") == DEFAULT_CONFIG
 
 
 def test_loads_config():
@@ -89,16 +89,14 @@ def test_missing_file_raises():
 def test_non_object_json_raises(tmp_path):
     path = tmp_path / "revisions.json"
     path.write_text(json.dumps(["not", "an", "object"]), encoding="utf-8")
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError, match="must be a JSON object"):
         load_category_config(path)
 
 
 def test_missing_section_raises(tmp_path):
     path = tmp_path / "revisions.json"
-    path.write_text(
-        json.dumps({"sub_category_order": [], "revisions": {}}), encoding="utf-8"
-    )
-    with pytest.raises(ValueError):
+    path.write_text(json.dumps({"sub_category_order": [], "revisions": {}}), encoding="utf-8")
+    with pytest.raises(ValueError, match="category_order"):
         load_category_config(path)
 
 
@@ -114,7 +112,7 @@ def test_non_string_revision_values_raise(tmp_path):
         ),
         encoding="utf-8",
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError, match="must map strings to strings"):
         load_category_config(path)
 
 
@@ -130,7 +128,7 @@ def test_duplicate_order_entry_raises(tmp_path):
         ),
         encoding="utf-8",
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="contains duplicates"):
         load_category_config(path)
 
 
@@ -146,5 +144,5 @@ def test_non_idempotent_revisions_raise(tmp_path):
         ),
         encoding="utf-8",
     )
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="not idempotent"):
         load_category_config(path)

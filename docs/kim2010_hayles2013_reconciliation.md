@@ -433,13 +433,12 @@ archived `01`. It lives only in `tmp/`, which is gitignored and untracked:
 import pandas as pd
 
 union = pd.read_excel(
-    "tmp/01_format_and_update_ids/data/1_formatted/"
-    "Kim2010_Hayles2013_merged_formatted.xlsx"
+    "tmp/01_format_and_update_ids/data/1_formatted/Kim2010_Hayles2013_merged_formatted.xlsx"
 )
-union[union["Presence"] == "2010_only"]        # 10 gene-level rows; .10c is folded into .09c
-union[union["Presence"] == "neither"]          # the 60 never-constructed candidates
-union[union["Presence"] == "2013_only"]        # the 18 Table S2 additions
-union[union["Dispensability_consistency"] == "inconsistent"]   # the 29 call changes
+union[union["Presence"] == "2010_only"]  # 10 gene-level rows; .10c is folded into .09c
+union[union["Presence"] == "neither"]  # the 60 never-constructed candidates
+union[union["Presence"] == "2013_only"]  # the 18 Table S2 additions
+union[union["Dispensability_consistency"] == "inconsistent"]  # the 29 call changes
 union[union["Dispensability_change_class"] == "undocumented_change"]  # the 4
 ```
 

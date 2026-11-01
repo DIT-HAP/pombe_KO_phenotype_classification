@@ -19,9 +19,7 @@ def test_add_annotation_direct_and_synonym_fallback():
             "synonyms": [None, "old2, alias2", None],
         }
     )
-    merged = pd.DataFrame(
-        {"Systematic ID": ["SPAC1.01", "alias2", "SPAC3.03"]}
-    )
+    merged = pd.DataFrame({"Systematic ID": ["SPAC1.01", "alias2", "SPAC3.03"]})
 
     result = format_hayles.add_annotation(merged, annotation)
 

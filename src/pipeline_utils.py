@@ -30,14 +30,14 @@ Version:  1.0.0
 # IMPORTS
 # =============================================================================
 # 1. Standard Library Imports
-import sys
 from pathlib import Path
+import sys
 
-# 2. Data Processing Imports
-import pandas as pd
-
-# 3. Third-party Imports
+# 2. Third-party Imports
 from loguru import logger
+
+# 3. Data Processing Imports
+import pandas as pd
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -63,6 +63,33 @@ def setup_logger(log_level: str = "INFO") -> None:
 
 
 # =============================================================================
+# BOUNDARY VALIDATION
+# =============================================================================
+
+
+def require_columns(
+    df: pd.DataFrame,
+    required: tuple[str, ...],
+    source: Path,
+) -> None:
+    """Raise ValueError when *source* lacks any required column."""
+    missing = set(required) - set(df.columns)
+    if missing:
+        raise ValueError(f"{source}: missing required columns {sorted(missing)}")
+
+
+def require_sheets(
+    sheets: dict[str, pd.DataFrame],
+    required: tuple[str, ...],
+    source: Path,
+) -> None:
+    """Raise ValueError when *source* lacks any required worksheet."""
+    missing = set(required) - set(sheets)
+    if missing:
+        raise ValueError(f"{source}: missing required sheets {sorted(missing)}")
+
+
+# =============================================================================
 # REFERENCE TABLES (DIT-HAP / gRNA)
 # =============================================================================
 
@@ -70,7 +97,9 @@ def setup_logger(log_level: str = "INFO") -> None:
 def _load_metric(path: Path, value_col: str, sign: int = 1) -> pd.DataFrame:
     """Load one metric by systematic ID, dropping missing values."""
     df = pd.read_csv(path, sep="\t")
-    df = df[["Systematic ID", value_col]].dropna(subset=[value_col]).copy()
+    columns = ("Systematic ID", value_col)
+    require_columns(df, columns, path)
+    df = df[list(columns)].dropna(subset=[value_col]).copy()
     if sign != 1:
         df[value_col] = sign * df[value_col]
     return df
@@ -96,7 +125,8 @@ def category_dr_medians(
     ascending puts the most depleted category first, i.e. tier 1.
     """
     joined = df.merge(dit_hap, on="Systematic ID", how="left")
-    return joined.groupby(category_col)["DR"].median().sort_values(ascending=True)
+    medians = joined.groupby(category_col)[["DR"]].median()["DR"]
+    return medians.sort_values(ascending=True)
 
 
 def dr_tier_map(

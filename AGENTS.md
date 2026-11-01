@@ -10,9 +10,10 @@ DIT-HAP/gRNA depletion-rate validation.
   `mamba run -n bioinformatics python ...`
 - `06`/`07` also need `cnsplots`. On this machine it is installed in the
   separate `cnsplots` env: `mamba run -n cnsplots python scripts/06_...py`.
-- No `requirements.txt` / `pyproject.toml`. Runtime deps: `pandas`, `numpy`,
-  `loguru`, `matplotlib`, `openpyxl` (xlsx I/O), `xlrd` (xls I/O for the
-  Kim 2010 supplementary table), `scipy`, `pytest`.
+- `pyproject.toml` configures the ruff/ty quality gates; it does not provision
+  an environment. Runtime deps: `pandas`, `numpy`, `loguru`, `matplotlib`,
+  `openpyxl` (xlsx I/O), `xlrd` (xls I/O for the Kim 2010 supplementary
+  table), `scipy`, `pytest`.
 - Python 3.12+.
 
 ## Running scripts
@@ -56,7 +57,7 @@ DIT-HAP/gRNA depletion-rate validation.
 ## Testing
 
 ```bash
-mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (128 tests)
+mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (130 tests)
 mamba run -n bioinformatics python -m pytest tests/test_growth_signals.py -v
 mamba run -n bioinformatics python -m pytest tests/test_classification.py -v
 mamba run -n bioinformatics python -m pytest tests/test_dataset_merge.py -v
@@ -70,6 +71,27 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
   (`from growth_signals import classify_growth`).
 - Test files are the spec for the classifier. `docs/tests.md` documents every
   case and its expected category/tier.
+
+## Quality gates
+
+`pyproject.toml` is the source of truth for ruff and ty. Run from the repo root:
+
+```bash
+mamba run -n bioinformatics ruff check .
+mamba run -n bioinformatics ruff format --check .
+mamba run -n bioinformatics ty check
+mamba run -n bioinformatics ty check \
+    --python "$(mamba run -n cnsplots python -c 'import sys; print(sys.prefix)')" \
+    scripts/06_plot_dr_distribution.py scripts/07_plot_dr_distribution_pure.py
+```
+
+- The first `ty check` covers `src/` and steps `00`-`05`. Steps `06`/`07`
+  import `cnsplots`, which exists only in the separate `cnsplots` env, so they
+  are excluded from the default run and checked explicitly against that env.
+- `scripts/arc/` (deprecated implementation) and `tmp/` (gitignored archive)
+  are excluded from both ruff and ty.
+- Every function has full type hints and a docstring; imports stay at file
+  scope except the `src/` path setup, which carries `# noqa: E402`.
 
 ## Architecture
 
@@ -96,7 +118,8 @@ mamba run -n bioinformatics python -m pytest tests/ -k <pattern>  # single case
   stats-table columns and p-value brackets. Imported by `06` and `07`; it
   needs matplotlib and scipy but not cnsplots.
 - `src/pipeline_utils.py` — shared `setup_logger`, `load_dit_hap`,
-  `category_dr_medians`, and the `DEFAULT_RELEASE` constant.
+  `category_dr_medians`, the `require_columns` / `require_sheets` boundary
+  validators, and the `DEFAULT_RELEASE` constant.
 - `src/category_revisions.py` — shared loader for
   `data/4_categorized_genes/category_revisions.json`, which has three sections:
   `sub_category_order` (original figure), `revisions` (`Sub_category → Category`

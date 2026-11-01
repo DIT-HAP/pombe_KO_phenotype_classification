@@ -20,7 +20,7 @@ from id_mapping import (
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def annotation() -> pd.DataFrame:
     """Small PomBase-like annotation with every lookup layer."""
     return pd.DataFrame(
@@ -191,9 +191,9 @@ def test_combine_mapping_notes_single_and_collapsed():
     notes = {"SPAC27D7.09c": "NO_CHANGE", "SPAC27D7.10c": "VIA_SYNONYM → SPAC27D7.09c"}
 
     assert combine_mapping_notes("SPAC27D7.09c", notes) == "NO_CHANGE"
-    assert combine_mapping_notes(
-        "SPAC27D7.09c; SPAC27D7.10c", notes
-    ).startswith("COLLAPSED: SPAC27D7.09c: NO_CHANGE")
+    assert combine_mapping_notes("SPAC27D7.09c; SPAC27D7.10c", notes).startswith(
+        "COLLAPSED: SPAC27D7.09c: NO_CHANGE"
+    )
 
 
 def test_read_pombase_annotation_strips_whitespace(tmp_path: Path):

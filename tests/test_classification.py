@@ -12,11 +12,13 @@ import importlib
 
 import numpy as np
 import pandas as pd
+
 from growth_signals import (
-    filter_primary_segments,
-    count_growth_segments,
-    MODIFIER_WORDS,
     GROWTH_KEYWORDS,
+    MODIFIER_WORDS,
+    classify_growth,
+    count_growth_segments,
+    filter_primary_segments,
 )
 
 # 03_group_genes.py has a numeric filename, so it cannot be a normal import.
@@ -40,16 +42,12 @@ class TestFilterPrimarySegments:
 
     def test_drop_some_segment(self):
         """``some germination long`` starts with ``some`` → dropped."""
-        result = filter_primary_segments(
-            "VIABLE WT cells, some germination long"
-        )
+        result = filter_primary_segments("VIABLE WT cells, some germination long")
         assert result == "VIABLE WT cells"
 
     def test_drop_some_keep_others(self):
         """``some division`` dropped, ``spores`` and ``germinated spores`` kept."""
-        result = filter_primary_segments(
-            "ESSENTIAL spores, germinated spores, some division"
-        )
+        result = filter_primary_segments("ESSENTIAL spores, germinated spores, some division")
         assert result == "ESSENTIAL spores, germinated spores"
 
     def test_drop_occasionally_keep_growth_segments(self):
@@ -63,14 +61,13 @@ class TestFilterPrimarySegments:
 
     def test_drop_slightly_modifier(self):
         """``slightly misshapen cells`` is a modifier segment → dropped."""
-        result = filter_primary_segments(
-            "ESSENTIAL germinated spores, slightly misshapen cells"
-        )
+        result = filter_primary_segments("ESSENTIAL germinated spores, slightly misshapen cells")
         assert result == "ESSENTIAL germinated spores"
 
     def test_drop_initially(self):
         result = filter_primary_segments(
-            "ESSENTIAL germinated spores very large swollen branched, initially germinated spores long"
+            "ESSENTIAL germinated spores very large swollen branched, "
+            "initially germinated spores long"
         )
         assert "initially germinated spores long" not in result
         assert "germinated spores very large swollen branched" in result
@@ -86,37 +83,27 @@ class TestFilterPrimarySegments:
 
     def test_keep_divide_once(self):
         """``divide once`` — ``divide`` is not a modifier → KEPT."""
-        result = filter_primary_segments(
-            "ESSENTIAL germinated spores, divide once"
-        )
+        result = filter_primary_segments("ESSENTIAL germinated spores, divide once")
         assert "divide once" in result
 
     def test_all_modifier_segments(self):
         """When every segment is modifier-led, fallback to the first segment."""
-        result = filter_primary_segments(
-            "VIABLE cells, occasionally long, slightly misshapen"
-        )
+        result = filter_primary_segments("VIABLE cells, occasionally long, slightly misshapen")
         assert result == "VIABLE cells"
 
     def test_only_modifier_segments(self):
-        result = filter_primary_segments(
-            "initially rounded, slightly misshapen"
-        )
+        result = filter_primary_segments("initially rounded, slightly misshapen")
         # Both start with modifier words → fallback to first
         assert result == "initially rounded"
 
     def test_possibly_segment(self):
         """``possibly diploidising`` starts with ``possibly`` → dropped."""
-        result = filter_primary_segments(
-            "VIABLE small colonies long cells, possibly diploidising"
-        )
+        result = filter_primary_segments("VIABLE small colonies long cells, possibly diploidising")
         assert "possibly diploidising" not in result
         assert result == "VIABLE small colonies long cells"
 
     def test_often_segment(self):
-        result = filter_primary_segments(
-            "ESSENTIAL germinated spores, often divide once"
-        )
+        result = filter_primary_segments("ESSENTIAL germinated spores, often divide once")
         assert "often divide once" not in result
         assert result == "ESSENTIAL germinated spores"
 
@@ -173,7 +160,8 @@ class TestClassifyPhenotypeCount:
 
     def test_non_string_nan(self):
         result = classify_phenotype_count(np.nan)
-        assert isinstance(result, float) and np.isnan(result)
+        assert isinstance(result, float)
+        assert np.isnan(result)
 
     def test_two_parallel_multiple(self):
         """spores + germinated spores = 2 growth segments → Multiple."""
@@ -226,11 +214,7 @@ class TestClassifyPhenotypeCount:
         ``some germination long`` starts with modifier ``some`` → dropped,
         leaving ``VIABLE WT cells`` → no growth signal → WT-like (tier 5).
         """
-        from growth_signals import filter_primary_segments, classify_growth
-
-        filtered = filter_primary_segments(
-            "VIABLE WT cells, some germination long"
-        )
+        filtered = filter_primary_segments("VIABLE WT cells, some germination long")
         assert filtered == "VIABLE WT cells"
 
         cat, tier = classify_growth(filtered)
@@ -241,9 +225,7 @@ class TestClassifyPhenotypeCount:
 class TestSplitBasicAdditional:
     def test_removes_only_the_at_suffix(self):
         split = split_basic_additional(
-            pd.Series(
-                ["VIABLE mutant at 25,32", "VIABLE elongated at 25,32"]
-            ),
+            pd.Series(["VIABLE mutant at 25,32", "VIABLE elongated at 25,32"]),
             " 25,32",
         )
         assert split["Basic phenotype"].tolist() == [
@@ -257,12 +239,12 @@ class TestSplitBasicAdditional:
 
 class TestConstantIntegrity:
     def test_modifier_words_are_unique(self):
-        assert len(MODIFIER_WORDS) == len(set(MODIFIER_WORDS)), \
-            "MODIFIER_WORDS contains duplicates"
+        assert len(MODIFIER_WORDS) == len(set(MODIFIER_WORDS)), "MODIFIER_WORDS contains duplicates"
 
     def test_growth_keywords_are_unique(self):
-        assert len(GROWTH_KEYWORDS) == len(set(GROWTH_KEYWORDS)), \
+        assert len(GROWTH_KEYWORDS) == len(set(GROWTH_KEYWORDS)), (
             "GROWTH_KEYWORDS contains duplicates"
+        )
 
     def test_all_modifier_words_start_lowercase(self):
         for m in MODIFIER_WORDS:

@@ -33,9 +33,9 @@ Output
 - ``data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes.xlsx``
   Inspection pivot tables — separate from the main output for easy review:
     - ``Flat inspection`` — one row per unique description with gene counts
-    - Per‑branch Phenotypes, Essentiality, Classification, Growth_tier pivots
-    - ``Multi-level pivot (All genes)`` — full description text × 4‑level
-      column hierarchy with conditional formatting and binary‑signature sorting
+    - Per-branch Phenotypes, Essentiality, Classification, Growth_tier pivots
+    - ``Multi-level pivot (All genes)`` — full description text x 4-level
+      column hierarchy with conditional formatting and binary-signature sorting
 
 Usage
 -----
@@ -52,14 +52,14 @@ Version:  1.2.1
 # =============================================================================
 # 1. Standard Library Imports
 import argparse
-import sys
 from pathlib import Path
+import sys
 
-# 2. Data Processing Imports
-import pandas as pd
-
-# 3. Third-party Imports
+# 2. Third-party Imports
 from loguru import logger
+
+# 3. Data Processing Imports
+import pandas as pd
 
 # 4. Project Path Setup
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -67,14 +67,20 @@ SRC_DIR = SCRIPT_DIR.parent / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-# 5. Local modules
-from growth_signals import GROWTH_SIGNALS, classify_growth
-from phenotype import (
+# 5. Local imports
+from growth_signals import SIGNAL_TIERS, classify_growth  # noqa: E402
+from phenotype import (  # noqa: E402
     DISPENSABILITY_COL,
     MORPHOLOGY_COL,
     PHENOTYPE_DESC_COL,
 )
-from pipeline_utils import dr_tier_map, load_dit_hap, setup_logger
+from pipeline_utils import (  # noqa: E402
+    dr_tier_map,
+    load_dit_hap,
+    require_columns,
+    require_sheets,
+    setup_logger,
+)
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -86,48 +92,42 @@ DEFAULT_MANUAL = Path(
     "data/references/previous_manual_check_of_insistent_phenotypes"
     "/Inconsistent_phenotypes_at_25_32_manual.xlsx"
 )
-DEFAULT_OUTPUT = Path(
-    "data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx"
+DEFAULT_OUTPUT = Path("data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx")
+DEFAULT_DIT_HAP = Path("data/raw/gene_level_fitting_statistics_minusDR.tsv")
+
+DATA_SHEETS: tuple[str, ...] = (
+    "One basic phenotype",
+    "Multi basic phenotypes",
+    "Inconsistent phenotypes",
 )
-DEFAULT_DIT_HAP = Path(
-    "data/raw/gene_level_fitting_statistics_minusDR.tsv"
+GROUPED_COLUMNS: tuple[str, ...] = (
+    "Systematic ID",
+    "Phenotype_count",
+    "Consistency_25_32",
+    DISPENSABILITY_COL,
+    MORPHOLOGY_COL,
+    PHENOTYPE_DESC_COL,
 )
+BASIC_COLUMNS: tuple[str, ...] = ("Basic phenotype",)
+MANUAL_COLUMNS: tuple[str, ...] = ("SysID", "Category_25", "Category_32")
 
 DESC_COL = PHENOTYPE_DESC_COL
-
-# Reverse lookup: known category name → growth tier.
-# Derived from the canonical signal table; fallback to tier 5 (WT).
-CATEGORY_TO_TIER: dict[str, int] = {}
-for sig in GROWTH_SIGNALS:
-    CATEGORY_TO_TIER[sig.category] = sig.tier
-
-# =============================================================================
-# LOGGING SETUP
-# =============================================================================
-
-
-setup_logger()
-
 
 # =============================================================================
 # CORE LOGIC
 # =============================================================================
 
 
-def rerank_growth_tier_by_dr(df: pd.DataFrame, dit_hap_path: Path) -> pd.DataFrame:
+def rerank_growth_tier_by_dr(df: pd.DataFrame, dit_hap: pd.DataFrame) -> pd.DataFrame:
     """Reassign Growth_tier based on DR median per Category, most depleted first.
 
     DR is sign-flipped (more negative = more depleted), so the lowest median
     becomes tier 1.
     """
-    tier_map, _ = dr_tier_map(df, load_dit_hap(dit_hap_path))
-    df["Growth_tier"] = (
-        df["Category"].map(tier_map)
-        .fillna(len(tier_map) + 1)
-        .astype(int)
-    )
+    tier_map, _ = dr_tier_map(df, dit_hap)
+    tiers = df["Category"].map(tier_map).astype(int)
     logger.info(f"  Growth_tier re-ranked by DR median ({len(tier_map)} categories)")
-    return df
+    return df.assign(Growth_tier=tiers)
 
 
 def classify_basic_phenotype(df: pd.DataFrame) -> pd.DataFrame:
@@ -136,11 +136,9 @@ def classify_basic_phenotype(df: pd.DataFrame) -> pd.DataFrame:
     Used for both the one-phenotype and multi-phenotype branches —
     ``classify_growth`` handles modifier-led segments internally.
     """
-    results = df["Basic phenotype"].apply(classify_growth)
+    results = df["Basic phenotype"].map(classify_growth)
     df = df.copy()
-    df[["Category", "Growth_tier"]] = pd.DataFrame(
-        results.tolist(), index=df.index
-    )
+    df[["Category", "Growth_tier"]] = pd.DataFrame(results.tolist(), index=df.index)
     return df
 
 
@@ -156,6 +154,7 @@ def classify_inconsistent_phenotype(
     """
     logger.info(f"Loading manual annotations: {manual_path}")
     manual = pd.read_excel(manual_path)
+    require_columns(manual, MANUAL_COLUMNS, manual_path)
 
     df = df.merge(
         manual[["SysID", "Category_25", "Category_32"]],
@@ -168,7 +167,7 @@ def classify_inconsistent_phenotype(
     df["Category"] = df["Category_32"].fillna("WT-like").replace({"WT": "WT-like"})
 
     # Derive Growth_tier from category name
-    df["Growth_tier"] = df["Category"].map(CATEGORY_TO_TIER).fillna(5).astype(int)
+    df["Growth_tier"] = df["Category"].map(SIGNAL_TIERS).fillna(5).astype(int)
 
     return df
 
@@ -214,38 +213,30 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
-    """Main orchestrator."""
-    args = parse_args()
-    if args.verbose:
-        setup_logger(log_level="DEBUG")
+def load_grouped(path: Path) -> dict[str, pd.DataFrame]:
+    """Load the grouped workbook and validate its sheets and required columns."""
+    grouped = pd.read_excel(path, sheet_name=None)
+    require_sheets(grouped, DATA_SHEETS, path)
+    for sheet_name in DATA_SHEETS:
+        require_columns(grouped[sheet_name], GROUPED_COLUMNS, path)
+    for sheet_name in DATA_SHEETS[:2]:
+        require_columns(grouped[sheet_name], BASIC_COLUMNS, path)
+    return grouped
 
-    grouped_path = args.grouped.resolve()
-    manual_path = args.manual.resolve()
-    output_path = args.output.resolve()
 
-    logger.info(f"Reading grouped phenotypes: {grouped_path}")
-    grouped = pd.read_excel(grouped_path, sheet_name=None)
-
-    # ------------------------------------------------------------------
-    # 1. One basic phenotype
-    # ------------------------------------------------------------------
-    logger.info(
-        f"Processing 'One basic phenotype' ({len(grouped['One basic phenotype'])} genes)…"
-    )
+def classify_branches(
+    grouped: dict[str, pd.DataFrame],
+    manual_path: Path,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Classify the one-, multi-, and inconsistent-phenotype branches."""
+    logger.info(f"Processing 'One basic phenotype' ({len(grouped['One basic phenotype'])} genes)…")
     one = classify_basic_phenotype(grouped["One basic phenotype"])
 
-    # ------------------------------------------------------------------
-    # 2. Multi basic phenotypes
-    # ------------------------------------------------------------------
     logger.info(
         f"Processing 'Multi basic phenotypes' ({len(grouped['Multi basic phenotypes'])} genes)…"
     )
     multi = classify_basic_phenotype(grouped["Multi basic phenotypes"])
 
-    # ------------------------------------------------------------------
-    # 3. Inconsistent phenotypes
-    # ------------------------------------------------------------------
     logger.info(
         f"Processing 'Inconsistent phenotypes' ({len(grouped['Inconsistent phenotypes'])} genes)…"
     )
@@ -253,133 +244,106 @@ def main() -> int:
         grouped["Inconsistent phenotypes"],
         manual_path,
     )
+    return one, multi, inconsistent
 
-    # ------------------------------------------------------------------
-    # 4. Build pivot tables
-    # ------------------------------------------------------------------
+
+def build_pivots(
+    branches: dict[str, pd.DataFrame],
+    all_genes: pd.DataFrame,
+) -> dict[str, pd.DataFrame]:
+    """Build one pivot sheet per branch and dimension, plus the combined branch."""
     pivots: dict[str, pd.DataFrame] = {}
-
-    for label, df in [
-        ("One basic phenotype", one),
-        ("Multi basic phenotypes", multi),
-        ("Inconsistent phenotypes", inconsistent),
-    ]:
+    for label, frame in branches.items():
         pivots[f"Phenotypes pivot ({label})"] = build_pivot(
-            df, DESC_COL, "Category"
+            frame,
+            DESC_COL,
+            "Category",
         )
         pivots[f"Essentiality pivot ({label})"] = build_pivot(
-            df, DISPENSABILITY_COL, "Category"
+            frame,
+            DISPENSABILITY_COL,
+            "Category",
         )
         pivots[f"Classification pivot ({label})"] = build_pivot(
-            df, MORPHOLOGY_COL, "Category"
+            frame,
+            MORPHOLOGY_COL,
+            "Category",
         )
         pivots[f"Growth_tier pivot ({label})"] = build_pivot(
-            df, MORPHOLOGY_COL, "Growth_tier"
-        )
-
-    # Also build a combined "All genes" pivot for the full description
-    all_genes = pd.concat([one, multi, inconsistent], ignore_index=True)
-
-    # Re-rank Growth_tier by DR median (unified with 05_merge_categories)
-    logger.info("Re-ranking Growth_tier by DIT-HAP DR median…")
-    all_genes = rerank_growth_tier_by_dr(all_genes, DEFAULT_DIT_HAP)
-    # Apply same re-ranking to individual branches
-    n_one = len(one)
-    n_multi = len(multi)
-    one = all_genes.iloc[:n_one].copy()
-    multi = all_genes.iloc[n_one:n_one + n_multi].copy()
-    inconsistent = all_genes.iloc[n_one + n_multi:].copy()
-    pivots["Phenotypes pivot (All genes)"] = build_pivot(
-        all_genes, DESC_COL, "Category"
-    )
-
-    # ------------------------------------------------------------------
-    # 4b. Multi-level pivot for quality inspection
-    #     Rows: full description text.
-    #     Columns: (Growth_tier, Category, Phenotype_count, Consistency_25_32).
-    #     Cells: gene count. Conditional format: colour only non-zero cells.
-    # ------------------------------------------------------------------
-    logger.info("Building multi-level inspection pivot…")
-
-    # Group counts by all four dimensions
-    grouped = (
-        all_genes
-        .groupby([
-            DESC_COL,
+            frame,
+            MORPHOLOGY_COL,
             "Growth_tier",
-            "Category",
-            "Phenotype_count",
-            "Consistency_25_32",
-        ])
-        .size()
-        .rename("Count")
-        .reset_index()
+        )
+    pivots["Phenotypes pivot (All genes)"] = build_pivot(
+        all_genes,
+        DESC_COL,
+        "Category",
+    )
+    return pivots
+
+
+def split_reranked_branches(
+    all_genes: pd.DataFrame,
+    n_one: int,
+    n_multi: int,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Slice the concatenated, re-ranked table back into its three branches."""
+    return (
+        all_genes.iloc[:n_one].copy(),
+        all_genes.iloc[n_one : n_one + n_multi].copy(),
+        all_genes.iloc[n_one + n_multi :].copy(),
     )
 
-    # Pivot with four-level column index
-    multi_pivot = grouped.pivot_table(
+
+def build_inspection_pivot(all_genes: pd.DataFrame) -> pd.DataFrame:
+    """Pivot gene counts by description and the four classification dimensions."""
+    dimensions = [
+        DESC_COL,
+        "Growth_tier",
+        "Category",
+        "Phenotype_count",
+        "Consistency_25_32",
+    ]
+    counts = all_genes.groupby(dimensions).agg(Count=(DESC_COL, "size")).reset_index()
+    multi_pivot = counts.pivot_table(
         index=DESC_COL,
         columns=["Growth_tier", "Category", "Phenotype_count", "Consistency_25_32"],
         values="Count",
         fill_value=0,
     ).astype(int)
 
-    # Sort columns: Growth_tier ascending (1→5), then alphabetical for lower levels
+    # Growth_tier ascending (1 to 5), then alphabetical for lower levels.
     multi_pivot = multi_pivot.sort_index(axis=1)
-
-    # Sort rows so that within each column's non-zero block, values are
-    # sorted descending (largest / most representative at the top).
-    # Columns are prioritised left-to-right (Growth_tier 1 then 2 then 3…):
-    # column 0 is the primary sort key, column 1 the secondary, etc.
-    # All-zero rows sink to the bottom.
+    # Within each column's non-zero block, the largest count sorts first; the
+    # leftmost column is the primary key and all-zero rows sink to the bottom.
     sort_cols = list(multi_pivot.columns)
-    multi_pivot = multi_pivot.sort_values(
+    return multi_pivot.sort_values(
         by=sort_cols,
         ascending=[False] * len(sort_cols),
     )
 
-    styled_pivot = multi_pivot.style.map(
-        lambda v: "background-color: #DCE6F1" if v > 0 else "",
-    )
 
-    # ------------------------------------------------------------------
-    # 4c. Flat inspection table — one row per unique description + gene count
-    # ------------------------------------------------------------------
-    logger.info("Building flat inspection table…")
-    flat_full = all_genes[
-        [
-            DESC_COL,
-            "Category",
-            "Phenotype_count",
-            "Growth_tier",
-            "Consistency_25_32",
-        ]
-    ].copy()
-
-    # Count genes per (description, Category, Phenotype_count, Growth_tier, Consistency)
+def build_flat_inspection(all_genes: pd.DataFrame) -> pd.DataFrame:
+    """Build one row per unique description and classification combination."""
+    dimensions = [
+        DESC_COL,
+        "Category",
+        "Phenotype_count",
+        "Growth_tier",
+        "Consistency_25_32",
+    ]
     gene_counts = (
-        flat_full.groupby(
-            [
-                DESC_COL,
-                "Category",
-                "Phenotype_count",
-                "Growth_tier",
-                "Consistency_25_32",
-            ]
-        )
-        .size()
-        .rename("Gene count")
+        all_genes.groupby(dimensions)
+        .agg(**{"Gene count": (DESC_COL, "size")})
         .reset_index()
+        .rename(
+            columns={
+                DESC_COL: "Phenotype description",
+                "Phenotype_count": "Single/Multiple/Temp_mismatch",
+            }
+        )
     )
-
-    flat_inspection = gene_counts.rename(
-        columns={
-            DESC_COL: "Phenotype description",
-            "Phenotype_count": "Single/Multiple/Temp_mismatch",
-        }
-    )
-    # Column order: description, Category, S/M/T, Consistency, Growth_tier, Gene count
-    flat_inspection = flat_inspection[
+    ordered = gene_counts[
         [
             "Phenotype description",
             "Category",
@@ -389,25 +353,77 @@ def main() -> int:
             "Gene count",
         ]
     ]
-    flat_inspection.sort_values(
+    return ordered.sort_values(
         by=["Category", "Single/Multiple/Temp_mismatch", "Growth_tier", "Gene count"],
         ascending=[True, True, True, False],
-        inplace=True,
-    )
-    flat_inspection.reset_index(drop=True, inplace=True)
+    ).reset_index(drop=True)
 
-    # ------------------------------------------------------------------
-    # 5. Save
-    # ------------------------------------------------------------------
-    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Main data output: data sheets only
+def write_data_workbook(
+    output_path: Path,
+    one: pd.DataFrame,
+    multi: pd.DataFrame,
+    inconsistent: pd.DataFrame,
+    all_genes: pd.DataFrame,
+) -> None:
+    """Write the four data sheets of the categorized-phenotype workbook."""
     with pd.ExcelWriter(output_path) as writer:
         one.to_excel(writer, sheet_name="One basic phenotype", index=False)
         multi.to_excel(writer, sheet_name="Multi basic phenotypes", index=False)
         inconsistent.to_excel(writer, sheet_name="Inconsistent phenotypes", index=False)
         all_genes.to_excel(writer, sheet_name="All genes", index=False)
 
+
+def write_inspection_workbook(
+    inspection_path: Path,
+    flat_inspection: pd.DataFrame,
+    pivots: dict[str, pd.DataFrame],
+    multi_pivot: pd.DataFrame,
+) -> None:
+    """Write the flat inspection table, branch pivots, and multi-level pivot."""
+    styled_pivot = multi_pivot.style.map(
+        lambda value: "background-color: #DCE6F1" if value > 0 else "",
+    )
+    with pd.ExcelWriter(inspection_path) as writer:
+        flat_inspection.to_excel(writer, sheet_name="Flat inspection", index=False)
+        for sheet_name, pivot_df in pivots.items():
+            pivot_df.to_excel(writer, sheet_name=sheet_name[:31])
+        styled_pivot.to_excel(writer, sheet_name="Multi-level pivot (All genes)")
+
+
+def build_categorized(
+    grouped_path: Path,
+    manual_path: Path,
+    output_path: Path,
+) -> None:
+    """Categorise the three phenotype branches and write both workbooks."""
+    logger.info(f"Reading grouped phenotypes: {grouped_path}")
+    grouped = load_grouped(grouped_path)
+
+    one, multi, inconsistent = classify_branches(grouped, manual_path)
+    branches = {
+        "One basic phenotype": one,
+        "Multi basic phenotypes": multi,
+        "Inconsistent phenotypes": inconsistent,
+    }
+    all_genes = pd.concat([one, multi, inconsistent], ignore_index=True)
+    pivots = build_pivots(branches, all_genes)
+
+    logger.info("Re-ranking Growth_tier by DIT-HAP DR median…")
+    all_genes = rerank_growth_tier_by_dr(all_genes, load_dit_hap(DEFAULT_DIT_HAP))
+    one, multi, inconsistent = split_reranked_branches(
+        all_genes,
+        len(one),
+        len(multi),
+    )
+
+    logger.info("Building multi-level inspection pivot…")
+    multi_pivot = build_inspection_pivot(all_genes)
+    logger.info("Building flat inspection table…")
+    flat_inspection = build_flat_inspection(all_genes)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    write_data_workbook(output_path, one, multi, inconsistent, all_genes)
     logger.success(
         f"Categorized phenotypes saved: {output_path}\n"
         f"  One basic phenotype:    {len(one)} genes\n"
@@ -416,27 +432,27 @@ def main() -> int:
         f"  All genes:              {len(all_genes)} genes",
     )
 
-    # Inspection output: pivot tables + multi-level pivot
     inspection_path = output_path.with_name(
         output_path.stem.replace("_categorized", "_inspection") + output_path.suffix,
     )
-    with pd.ExcelWriter(inspection_path) as writer:
-        # Flat inspection table first — most useful for manual review
-        flat_inspection.to_excel(
-            writer, sheet_name="Flat inspection", index=False,
-        )
-
-        for sheet_name, pivot_df in pivots.items():
-            safe_name = sheet_name[:31]
-            pivot_df.to_excel(writer, sheet_name=safe_name)
-
-        # Multi-level inspection pivot (styled)
-        styled_pivot.to_excel(
-            writer, sheet_name="Multi-level pivot (All genes)",
-        )
-
+    write_inspection_workbook(inspection_path, flat_inspection, pivots, multi_pivot)
     n_sheets = 1 + len(pivots) + 1
     logger.success(f"Inspection pivots saved: {inspection_path}  ({n_sheets} sheets)")
+
+
+def main() -> int:
+    """Run the categorization and propagate fatal errors as exit code 1."""
+    args = parse_args()
+    setup_logger(log_level="DEBUG" if args.verbose else "INFO")
+    try:
+        build_categorized(
+            args.grouped.resolve(),
+            args.manual.resolve(),
+            args.output.resolve(),
+        )
+    except Exception as error:
+        logger.exception(f"Phenotype categorization failed: {error}")
+        return 1
     return 0
 
 

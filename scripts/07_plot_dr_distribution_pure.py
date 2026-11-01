@@ -60,20 +60,20 @@ Version:  1.0.0
 
 # 1. Standard Library Imports
 import argparse
-import sys
 from dataclasses import dataclass
-from functools import partial
 from pathlib import Path
+import sys
 
-# 2. Data Processing Imports
-import pandas as pd
-
-# 3. Third-party Imports
-import matplotlib
-matplotlib.use("Agg")
+# 2. Third-party Imports
 import cnsplots as cns
-import matplotlib.colors as mcolors
+from cnsplots._utils import apply_unicode_font as _cns_apply_unicode_font
 from loguru import logger
+import matplotlib as mpl
+from matplotlib.axes import Axes
+import matplotlib.colors as mcolors
+
+# 3. Data Processing Imports
+import pandas as pd
 
 # 4. Project Path Setup
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -82,7 +82,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 # 5. Local Imports
-from dr_plotting import (
+from dr_plotting import (  # noqa: E402
     CANVAS_SLACK_PT,
     DEFAULT_DIT_HAP,
     DEFAULT_GRNA,
@@ -114,8 +114,16 @@ from dr_plotting import (
     log_pvalues,
     stats_columns,
 )
-from phenotype import MORPHOLOGY_COL
-from pipeline_utils import load_dit_hap, load_grna, setup_logger
+from phenotype import MORPHOLOGY_COL  # noqa: E402
+from pipeline_utils import (  # noqa: E402
+    load_dit_hap,
+    load_grna,
+    require_columns,
+    setup_logger,
+)
+
+# Select the headless backend before any figure is created.
+mpl.use("Agg")
 
 # =============================================================================
 # GLOBAL CONSTANTS & ENUMS
@@ -132,13 +140,19 @@ PVALUE_NEUTRAL_COLOR = PALETTE[9]
 # cnsplots' default sizes, so a row only has to clear one 7 pt tick label.
 ROW_HEIGHT_PT = 16.89
 
+REQUIRED_COLUMNS: tuple[str, ...] = (
+    ID_COL,
+    SUB_CATEGORY_COL,
+    MORPHOLOGY_COL,
+)
+
 
 # =============================================================================
 # CONFIGURATION & DATACLASSES
 # =============================================================================
 
 
-@dataclass(kw_only=True, slots=True, frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class PureRow:
     """One drawn row: label, exact Sub_category, and optional morphology filter."""
 
@@ -168,6 +182,7 @@ PURE_ROWS: tuple[PureRow, ...] = (
 def load_merged(path: Path) -> pd.DataFrame:
     """Load the merged classification with sub-category and morphology columns."""
     df = pd.read_excel(path, sheet_name=MERGED_SHEET)
+    require_columns(df, REQUIRED_COLUMNS, path)
     return df[[ID_COL, SUB_CATEGORY_COL, MORPHOLOGY_COL]].copy()
 
 
@@ -190,19 +205,13 @@ def select_pure_rows(merged: pd.DataFrame) -> pd.DataFrame:
     return selected
 
 
-
-
 def build_row_colors() -> dict[str, str]:
     """Assign the first Cell-palette colours to the rows in draw order."""
     if len(PURE_ROWS) > len(PALETTE):
         logger.warning(
-            f"{len(PURE_ROWS)} rows exceed the {len(PALETTE)}-colour Cell "
-            "palette; colours repeat."
+            f"{len(PURE_ROWS)} rows exceed the {len(PALETTE)}-colour Cell palette; colours repeat."
         )
-    return {
-        row.label: PALETTE[index % len(PALETTE)]
-        for index, row in enumerate(PURE_ROWS)
-    }
+    return {row.label: PALETTE[index % len(PALETTE)] for index, row in enumerate(PURE_ROWS)}
 
 
 def row_tick_labels(order: list[str], frame: pd.DataFrame) -> list[str]:
@@ -211,38 +220,14 @@ def row_tick_labels(order: list[str], frame: pd.DataFrame) -> list[str]:
     return [f"{row} (n = {int(counts.get(row, 0))})" for row in order]
 
 
-
-
-
-
-
-
-
-
-# =============================================================================
-# STATISTICS LOGGING
-# =============================================================================
-
-
-
-
-
-
-
-
-
-
 # =============================================================================
 # PLOTTING
 # =============================================================================
 
 
-
-
-
-
-
-
+def _apply_unicode_font(ax: Axes | None = None, font: str = FONT_FAMILY) -> None:
+    """Apply the figure face as the fallback for characters the face lacks."""
+    _cns_apply_unicode_font(ax, font=font)
 
 
 def use_single_face() -> None:
@@ -256,15 +241,15 @@ def use_single_face() -> None:
     two faces, so that fallback is pointed at the figure font as well.
     """
     cns.settings.font_sans_serif = (FONT_FAMILY, "Helvetica", "DejaVu Sans")
-    cns._utils.apply_unicode_font = partial(cns.apply_unicode_font, font=FONT_FAMILY)
+    # cnsplots re-fonts non-ASCII text to its default fallback at save time;
+    # rebind that module-level hook so the figure face is the fallback instead.
+    vars(cns._utils)["apply_unicode_font"] = _apply_unicode_font
 
 
 def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
     """Draw the five-row violin figure plus its stats table and save it."""
     plot_height = spec.row_height_pt * len(spec.row_order)
-    tick_labels = [
-        row_tick_labels(spec.row_order, panel.frame) for panel in spec.panels
-    ]
+    tick_labels = [row_tick_labels(spec.row_order, panel.frame) for panel in spec.panels]
     label_width = max(len(label) for labels in tick_labels for label in labels) * LABEL_CHAR_PT
     columns, stats_width = stats_columns(spec)
     stats_width += STATS_SLACK_PT
@@ -315,8 +300,12 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
     for index, panel in enumerate(spec.panels):
         if spec.pairs:
             annotate_pairs(
-                axes[index], spec.row_order, panel.frame, spec.pairs,
-                PANEL_WIDTH_PT, spec.row_height_pt,
+                axes[index],
+                spec.row_order,
+                panel.frame,
+                spec.pairs,
+                PANEL_WIDTH_PT,
+                spec.row_height_pt,
                 significant_color=PVALUE_SIGNIFICANT_COLOR,
                 neutral_color=PVALUE_NEUTRAL_COLOR,
             )
@@ -338,7 +327,9 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     for suffix in (".png", ".pdf"):
         cns.savefig(output_path.with_suffix(suffix))
-    logger.success(f"Saved: {output_path.with_suffix('.png')} and {output_path.with_suffix('.pdf')}")
+    logger.success(
+        f"Saved: {output_path.with_suffix('.png')} and {output_path.with_suffix('.pdf')}"
+    )
 
 
 # =============================================================================
@@ -351,10 +342,27 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Plot DR/um distributions for five pure phenotype categories with cnsplots"
     )
-    parser.add_argument("--merged", type=Path, default=DEFAULT_MERGED, help=f"Merged categories xlsx (default: {DEFAULT_MERGED})")
-    parser.add_argument("--dit-hap", type=Path, default=DEFAULT_DIT_HAP, help=f"DIT-HAP TSV (default: {DEFAULT_DIT_HAP})")
-    parser.add_argument("--grna", type=Path, default=DEFAULT_GRNA, help=f"gRNA TSV (default: {DEFAULT_GRNA})")
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR, help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})")
+    parser.add_argument(
+        "--merged",
+        type=Path,
+        default=DEFAULT_MERGED,
+        help=f"Merged categories xlsx (default: {DEFAULT_MERGED})",
+    )
+    parser.add_argument(
+        "--dit-hap",
+        type=Path,
+        default=DEFAULT_DIT_HAP,
+        help=f"DIT-HAP TSV (default: {DEFAULT_DIT_HAP})",
+    )
+    parser.add_argument(
+        "--grna", type=Path, default=DEFAULT_GRNA, help=f"gRNA TSV (default: {DEFAULT_GRNA})"
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=DEFAULT_OUTPUT_DIR,
+        help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})",
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable DEBUG level logging")
     return parser.parse_args()
 

@@ -55,7 +55,11 @@ def test_build_long_frame_with_group():
     )
 
     frame = build_long_frame(
-        merged, values, "DR", row_col="Row label", group_col="Category",
+        merged,
+        values,
+        "DR",
+        row_col="Row label",
+        group_col="Category",
     )
 
     assert list(frame.columns) == [VALUE_COL, ROW_COL, GROUP_COL]

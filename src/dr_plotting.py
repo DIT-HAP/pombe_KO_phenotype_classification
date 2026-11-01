@@ -28,14 +28,14 @@ from dataclasses import dataclass, field
 from itertools import pairwise
 from pathlib import Path
 
-# 2. Data Processing Imports
-import pandas as pd
-
-# 3. Third-party Imports
+# 2. Third-party Imports
 from loguru import logger
 from matplotlib.axes import Axes
 from matplotlib.font_manager import FontProperties
 from matplotlib.textpath import TextPath
+
+# 3. Data Processing Imports
+import pandas as pd
 from scipy.stats import mannwhitneyu
 
 # =============================================================================
@@ -100,7 +100,7 @@ PVALUE_NOTE = "p: two-sided Mann-Whitney U (uncorrected)"
 # =============================================================================
 
 
-@dataclass(kw_only=True, slots=True, frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class Panel:
     """One proxy panel: its long-form frame, value-axis label, and short name."""
 
@@ -109,7 +109,7 @@ class Panel:
     short_label: str
 
 
-@dataclass(kw_only=True, slots=True, frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class FigureSpec:
     """Everything one output figure needs besides the loaded config."""
 
@@ -146,9 +146,7 @@ def build_long_frame(
     }
     if group_col is not None:
         data[GROUP_COL] = joined[group_col].to_numpy()
-    # The loaders already drop missing values; the guard keeps the per-row
-    # sample sizes honest if a different reference table is passed in.
-    return pd.DataFrame(data).dropna(subset=[VALUE_COL])
+    return pd.DataFrame(data)
 
 
 def build_stats_rows(spec: FigureSpec) -> list[list[str]]:
@@ -214,9 +212,7 @@ def adjacent_pairs(order: list[str], panels: list[Panel]) -> list[tuple[str, str
     counts = [panel.frame[ROW_COL].value_counts() for panel in panels]
     pairs = []
     for first, second in pairwise(order):
-        sizes_present = [
-            int(table.get(row, 0)) for table in counts for row in (first, second)
-        ]
+        sizes_present = [int(table.get(row, 0)) for table in counts for row in (first, second)]
         if min(sizes_present) >= 2:
             pairs.append((first, second))
     return pairs
@@ -259,8 +255,7 @@ def log_pvalues(pairs: list[tuple[str, str]], panels: list[Panel]) -> None:
         logger.info(f"  {panel.xlabel} — two-sided Mann-Whitney U (no correction)")
         for first, second in pairs:
             logger.info(
-                f"    {first:<32} vs {second:<32} "
-                f"p={pair_pvalue(panel.frame, first, second):.3e}"
+                f"    {first:<32} vs {second:<32} p={pair_pvalue(panel.frame, first, second):.3e}"
             )
 
 
@@ -296,18 +291,32 @@ def annotate_pairs(
         top, bottom = positions[first] + inset, positions[second] - inset
         for row in (top, bottom):
             ax.plot(
-                [inner_x, outer_x], [row, row],
-                transform=transform, color=color, linewidth=0.6, clip_on=False,
+                [inner_x, outer_x],
+                [row, row],
+                transform=transform,
+                color=color,
+                linewidth=0.6,
+                clip_on=False,
             )
         ax.plot(
-            [outer_x, outer_x], [top, bottom],
-            transform=transform, color=color, linewidth=0.6, clip_on=False,
+            [outer_x, outer_x],
+            [top, bottom],
+            transform=transform,
+            color=color,
+            linewidth=0.6,
+            clip_on=False,
         )
         ax.text(
-            text_x, (top + bottom) / 2, format_pvalue(pvalue),
-            transform=transform, ha="left", va="center",
-            color=color, fontsize=PVALUE_FONTSIZE,
-            fontweight="bold" if significant else "normal", clip_on=False,
+            text_x,
+            (top + bottom) / 2,
+            format_pvalue(pvalue),
+            transform=transform,
+            ha="left",
+            va="center",
+            color=color,
+            fontsize=PVALUE_FONTSIZE,
+            fontweight="bold" if significant else "normal",
+            clip_on=False,
         )
 
 
@@ -330,16 +339,27 @@ def draw_stats_panel(
     rows = build_stats_rows(spec)
     aligns = STATS_ALIGN * len(spec.panels)
     for index, cells in enumerate(rows):
-        for (left, right), align, cell in zip(columns, aligns, cells):
+        for (left, right), align, cell in zip(columns, aligns, cells, strict=True):
             ax.text(
-                (right if align == "right" else left) / width_pt, index, cell,
-                ha=align, va="center", family=FONT_FAMILY,
-                fontsize=fontsize, fontweight="bold",
+                (right if align == "right" else left) / width_pt,
+                index,
+                cell,
+                ha=align,
+                va="center",
+                family=FONT_FAMILY,
+                fontsize=fontsize,
+                fontweight="bold",
             )
     if spec.pvalue_note:
         ax.text(
-            0, len(rows), spec.pvalue_note, ha="left", va="center",
-            family=FONT_FAMILY, fontsize=fontsize, fontweight="normal",
+            0,
+            len(rows),
+            spec.pvalue_note,
+            ha="left",
+            va="center",
+            family=FONT_FAMILY,
+            fontsize=fontsize,
+            fontweight="normal",
         )
     # Copy the categorical limits (including their inversion) so the text rows
     # line up with the violins; this panel carries no axes of its own.

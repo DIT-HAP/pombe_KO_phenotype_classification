@@ -83,21 +83,20 @@ Version:  1.0.0
 
 # 1. Standard Library Imports
 import argparse
-import sys
-from functools import partial
 from pathlib import Path
+import sys
 
-# 2. Data Processing Imports
-import pandas as pd
-
-# 3. Third-party Imports
-import matplotlib
-matplotlib.use("Agg")
+# 2. Third-party Imports
 import cnsplots as cns
-import matplotlib.colors as mcolors
+from cnsplots._utils import apply_unicode_font as _cns_apply_unicode_font
 from loguru import logger
+import matplotlib as mpl
 from matplotlib.axes import Axes
+import matplotlib.colors as mcolors
 from matplotlib.patches import Patch
+
+# 3. Data Processing Imports
+import pandas as pd
 
 # 4. Project Path Setup
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -106,8 +105,12 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 # 5. Local Imports
-from category_revisions import DEFAULT_CONFIG, CategoryConfig, load_category_config
-from dr_plotting import (
+from category_revisions import (  # noqa: E402
+    DEFAULT_CONFIG,
+    CategoryConfig,
+    load_category_config,
+)
+from dr_plotting import (  # noqa: E402
     CANVAS_SLACK_PT,
     DEFAULT_DIT_HAP,
     DEFAULT_GRNA,
@@ -140,13 +143,22 @@ from dr_plotting import (
     log_pvalues,
     stats_columns,
 )
-from pipeline_utils import load_dit_hap, load_grna, setup_logger
+from pipeline_utils import (  # noqa: E402
+    load_dit_hap,
+    load_grna,
+    require_columns,
+    setup_logger,
+)
+
+# Select the headless backend before any figure is created.
+mpl.use("Agg")
 
 # =============================================================================
 # GLOBAL CONSTANTS & ENUMS
 # =============================================================================
 
 CATEGORY_COL = "Category"
+REQUIRED_COLUMNS: tuple[str, ...] = (ID_COL, SUB_CATEGORY_COL, CATEGORY_COL)
 
 # Panel geometry. The violin axes are 100 px wide in the 288 dpi export
 # (PANEL_WIDTH_PT = 25 pt); height grows with the number of rows. Text keeps
@@ -167,9 +179,8 @@ PVALUE_NEUTRAL_COLOR = "0.45"
 def load_merged(path: Path) -> pd.DataFrame:
     """Load the merged classification with systematic ID, sub-category and category."""
     df = pd.read_excel(path, sheet_name=MERGED_SHEET)
+    require_columns(df, REQUIRED_COLUMNS, path)
     return df[[ID_COL, SUB_CATEGORY_COL, CATEGORY_COL]].copy()
-
-
 
 
 def build_group_order(frames: list[pd.DataFrame], category_order: list[str]) -> list[str]:
@@ -220,34 +231,9 @@ def build_sub_category_rows(
     return rows, boundaries
 
 
-
-
-
-
-
-
-
-
-# =============================================================================
-# STATISTICS LOGGING
-# =============================================================================
-
-
-
-
-
-
-
-
-
-
 # =============================================================================
 # PLOTTING
 # =============================================================================
-
-
-
-
 
 
 def draw_group_legend(ax: Axes, spec: FigureSpec, colors: dict[str, str]) -> None:
@@ -263,11 +249,14 @@ def draw_group_legend(ax: Axes, spec: FigureSpec, colors: dict[str, str]) -> Non
     # that overhang as a top decoration of this panel and shifts its axes down,
     # which would leave the two panels' rows unaligned. Level it with the axes
     # top instead — the legend still hangs outside to the right.
-    ax.get_legend().set_bbox_to_anchor((1, 1.0))
+    legend = ax.get_legend()
+    if legend is not None:
+        legend.set_bbox_to_anchor((1, 1.0))
 
 
-
-
+def _apply_unicode_font(ax: Axes | None = None, font: str = FONT_FAMILY) -> None:
+    """Apply the figure face as the fallback for characters the face lacks."""
+    _cns_apply_unicode_font(ax, font=font)
 
 
 def use_single_face() -> None:
@@ -281,28 +270,20 @@ def use_single_face() -> None:
     two faces, so that fallback is pointed at the figure font as well.
     """
     cns.settings.font_sans_serif = (FONT_FAMILY, "Helvetica", "DejaVu Sans")
-    cns._utils.apply_unicode_font = partial(cns.apply_unicode_font, font=FONT_FAMILY)
+    # cnsplots re-fonts non-ASCII text to its default fallback at save time;
+    # rebind that module-level hook so the figure face is the fallback instead.
+    vars(cns._utils)["apply_unicode_font"] = _apply_unicode_font
 
 
-def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
-    """Draw one cnsplots figure — violin panels plus the stats table — and save it."""
-    plot_height = spec.row_height_pt * len(spec.row_order)
-    label_width = max(len(row) for row in spec.row_order) * LABEL_CHAR_PT
-    # Panel C is sized by its own table: the columns are measured in the face the
-    # rows are drawn in, at this figure's text size. Leftovers here show up as a
-    # gap before the legend, which hangs off this panel's right edge.
-    columns, stats_width = stats_columns(spec)
-    stats_width += STATS_SLACK_PT
-    margin_right = PVALUE_MARGIN_PT if spec.pairs else MARGIN_RIGHT_PT
-    canvas_width = (
-        2 * (PANEL_WIDTH_PT + PAD_LEFT_PT + label_width + margin_right)
-        + stats_width
-        + STATS_PAD_PT
-        + CANVAS_SLACK_PT
-    )
-
-    mp = cns.multipanel(max_width=canvas_width)
-    axes = []
+def draw_violin_panels(
+    mp: cns.multipanel,
+    spec: FigureSpec,
+    colors: dict[str, str],
+    plot_height: float,
+    margin_right: float,
+) -> list[Axes]:
+    """Draw one violin axes per proxy and return them left to right."""
+    axes: list[Axes] = []
     for index, panel in enumerate(spec.panels):
         ax = mp.panel(
             chr(ord("A") + index),
@@ -336,6 +317,28 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
 
     # Shared row labels: seaborn places the categories at 0..n-1 on the group axis.
     axes[0].set_yticks(range(len(spec.row_order)), labels=spec.row_order)
+    return axes
+
+
+def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
+    """Draw one cnsplots figure — violin panels plus the stats table — and save it."""
+    plot_height = spec.row_height_pt * len(spec.row_order)
+    label_width = max(len(row) for row in spec.row_order) * LABEL_CHAR_PT
+    # Panel C is sized by its own table: the columns are measured in the face the
+    # rows are drawn in, at this figure's text size. Leftovers here show up as a
+    # gap before the legend, which hangs off this panel's right edge.
+    columns, stats_width = stats_columns(spec)
+    stats_width += STATS_SLACK_PT
+    margin_right = PVALUE_MARGIN_PT if spec.pairs else MARGIN_RIGHT_PT
+    canvas_width = (
+        2 * (PANEL_WIDTH_PT + PAD_LEFT_PT + label_width + margin_right)
+        + stats_width
+        + STATS_PAD_PT
+        + CANVAS_SLACK_PT
+    )
+
+    mp = cns.multipanel(max_width=canvas_width)
+    axes = draw_violin_panels(mp, spec, colors, plot_height, margin_right)
 
     for boundary in spec.boundaries:
         for ax in axes:
@@ -344,8 +347,12 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
     for index, panel in enumerate(spec.panels):
         if spec.pairs:
             annotate_pairs(
-                axes[index], spec.row_order, panel.frame, spec.pairs,
-                PANEL_WIDTH_PT, spec.row_height_pt,
+                axes[index],
+                spec.row_order,
+                panel.frame,
+                spec.pairs,
+                PANEL_WIDTH_PT,
+                spec.row_height_pt,
                 significant_color=PVALUE_SIGNIFICANT_COLOR,
                 neutral_color=PVALUE_NEUTRAL_COLOR,
             )
@@ -371,7 +378,9 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     for suffix in (".png", ".pdf"):
         cns.savefig(output_path.with_suffix(suffix))
-    logger.success(f"Saved: {output_path.with_suffix('.png')} and {output_path.with_suffix('.pdf')}")
+    logger.success(
+        f"Saved: {output_path.with_suffix('.png')} and {output_path.with_suffix('.pdf')}"
+    )
 
 
 # =============================================================================
@@ -381,12 +390,36 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
 
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(description="Plot DR/um distributions by phenotype category with cnsplots")
-    parser.add_argument("--merged", type=Path, default=DEFAULT_MERGED, help=f"Merged categories xlsx (default: {DEFAULT_MERGED})")
-    parser.add_argument("--dit-hap", type=Path, default=DEFAULT_DIT_HAP, help=f"DIT-HAP TSV (default: {DEFAULT_DIT_HAP})")
-    parser.add_argument("--grna", type=Path, default=DEFAULT_GRNA, help=f"gRNA TSV (default: {DEFAULT_GRNA})")
-    parser.add_argument("--revisions", type=Path, default=DEFAULT_CONFIG, help=f"Category config JSON (default: {DEFAULT_CONFIG})")
-    parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR, help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})")
+    parser = argparse.ArgumentParser(
+        description="Plot DR/um distributions by phenotype category with cnsplots"
+    )
+    parser.add_argument(
+        "--merged",
+        type=Path,
+        default=DEFAULT_MERGED,
+        help=f"Merged categories xlsx (default: {DEFAULT_MERGED})",
+    )
+    parser.add_argument(
+        "--dit-hap",
+        type=Path,
+        default=DEFAULT_DIT_HAP,
+        help=f"DIT-HAP TSV (default: {DEFAULT_DIT_HAP})",
+    )
+    parser.add_argument(
+        "--grna", type=Path, default=DEFAULT_GRNA, help=f"gRNA TSV (default: {DEFAULT_GRNA})"
+    )
+    parser.add_argument(
+        "--revisions",
+        type=Path,
+        default=DEFAULT_CONFIG,
+        help=f"Category config JSON (default: {DEFAULT_CONFIG})",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=DEFAULT_OUTPUT_DIR,
+        help=f"Output directory (default: {DEFAULT_OUTPUT_DIR})",
+    )
     parser.add_argument("--verbose", action="store_true", help="Enable DEBUG level logging")
     return parser.parse_args()
 
@@ -442,12 +475,16 @@ def build_revised_spec(
     """Build the merged Category figure spec with adjacent-pair p-value brackets."""
     panels = [
         Panel(
-            frame=build_long_frame(merged, dit_hap, "DR", row_col=CATEGORY_COL, group_col=CATEGORY_COL),
+            frame=build_long_frame(
+                merged, dit_hap, "DR", row_col=CATEGORY_COL, group_col=CATEGORY_COL
+            ),
             xlabel="DR — DIT-HAP",
             short_label="DR",
         ),
         Panel(
-            frame=build_long_frame(merged, grna, "um", row_col=CATEGORY_COL, group_col=CATEGORY_COL),
+            frame=build_long_frame(
+                merged, grna, "um", row_col=CATEGORY_COL, group_col=CATEGORY_COL
+            ),
             xlabel="um — gRNA",
             short_label="um",
         ),

@@ -57,15 +57,15 @@ Version:  2.0.0
 # =============================================================================
 # 1. Standard Library Imports
 import argparse
-import sys
 from pathlib import Path
+import sys
 
-# 2. Data Processing Imports
+# 2. Third-party Imports
+from loguru import logger
+
+# 3. Data Processing Imports
 import numpy as np
 import pandas as pd
-
-# 3. Third-party Imports
-from loguru import logger
 
 # 4. Project Path Setup
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -74,9 +74,9 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 # 5. Project Imports
-from growth_signals import count_growth_segments
-from phenotype import PHENOTYPE_DESC_COL
-from pipeline_utils import setup_logger
+from growth_signals import count_growth_segments  # noqa: E402
+from phenotype import PHENOTYPE_DESC_COL  # noqa: E402
+from pipeline_utils import require_columns, setup_logger  # noqa: E402
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -89,12 +89,7 @@ DEFAULT_OUTPUT = Path("data/3_grouped_genes/Hayles_2013_OB_grouped_genes.xlsx")
 TEMP_BOTH = "25,32"
 TEMP_32 = "32"
 
-# =============================================================================
-# LOGGING SETUP
-# =============================================================================
-
-
-setup_logger()
+REQUIRED_COLUMNS: tuple[str, ...] = (PHENOTYPE_DESC_COL,)
 
 # =============================================================================
 # CORE LOGIC
@@ -102,20 +97,18 @@ setup_logger()
 
 
 def identify_consistency_groups(df: pd.DataFrame) -> dict[str, np.ndarray]:
-    """Return boolean masks for the three consistency groups.
-
-    Returns
-    -------
-    dict with keys 'both', 'only_32', 'inconsistent', each a boolean array
-    of length ``len(df)``.
-    """
+    """Return boolean masks for the three consistency groups."""
     desc = df[PHENOTYPE_DESC_COL]
 
     both = desc.str.contains(TEMP_BOTH, na=False)
     only_32 = desc.str.contains(TEMP_32, na=False) & (~desc.str.contains("25", na=False))
     inconsistent = (~both) & (~only_32)
 
-    return {"both": both.values, "only_32": only_32.values, "inconsistent": inconsistent.values}
+    return {
+        "both": both.to_numpy(),
+        "only_32": only_32.to_numpy(),
+        "inconsistent": inconsistent.to_numpy(),
+    }
 
 
 def split_basic_additional(desc_series: pd.Series, marker: str) -> pd.DataFrame:
@@ -127,16 +120,19 @@ def split_basic_additional(desc_series: pd.Series, marker: str) -> pd.DataFrame:
     parts = desc_series.str.split(marker, expand=True)
 
     basic = parts[0].str.removesuffix(" at").str.strip()
-    additional = parts[1].str.lstrip(", ").str.strip() if parts.shape[1] > 1 else pd.Series([None] * len(parts))
+    if parts.shape[1] > 1:
+        additional = parts[1].str.lstrip(", ").str.strip()
+    else:
+        additional = pd.Series([None] * len(parts))
 
     return pd.DataFrame({"Basic phenotype": basic, "Additional phenotype": additional})
 
 
 def classify_phenotype_count(phenotype: object) -> str | float:
-    """Classify as ``Single`` or ``Multiple``, or NaN for non‑string input.
+    """Classify as ``Single`` or ``Multiple``, or NaN for non-string input.
 
-    Counts how many comma‑separated segments contain a growth signal
-    (excluding modifier‑led segments).  More than one → ``Multiple``.
+    Counts how many comma-separated segments contain a growth signal
+    (excluding modifier-led segments).  More than one → ``Multiple``.
     """
     if not isinstance(phenotype, str):
         return np.nan
@@ -173,65 +169,55 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
-    """Main orchestrator."""
-    args = parse_args()
+def add_consistency_column(
+    df: pd.DataFrame,
+    groups: dict[str, np.ndarray],
+) -> pd.DataFrame:
+    """Label each gene's temperature consistency."""
+    consistency = pd.Series(index=df.index, dtype="object")
+    consistency.loc[groups["both"]] = "Consistent"
+    consistency.loc[groups["only_32"]] = "Only_32"
+    consistency.loc[groups["inconsistent"]] = "Mismatch"
+    return df.assign(Consistency_25_32=consistency)
 
-    if args.verbose:
-        setup_logger(log_level="DEBUG")
 
-    input_path = args.input.resolve()
-    output_path = args.output.resolve()
+def add_phenotype_splits(
+    df: pd.DataFrame,
+    groups: dict[str, np.ndarray],
+) -> pd.DataFrame:
+    """Split descriptions into basic and additional phenotypes per group."""
+    out = df.copy()
 
-    # ------------------------------------------------------------------
-    # 1. Load data
-    # ------------------------------------------------------------------
-    logger.info(f"Loading formatted phenotypes: {input_path}")
-    df = pd.read_excel(input_path)
-    logger.info(f"Loaded {len(df):,} genes")
-
-    # ------------------------------------------------------------------
-    # 2. Identify consistency groups
-    # ------------------------------------------------------------------
-    groups = identify_consistency_groups(df)
-    df["Consistency_25_32"] = pd.Series(index=df.index, dtype="object")
-    df.loc[groups["both"], "Consistency_25_32"] = "Consistent"
-    df.loc[groups["only_32"], "Consistency_25_32"] = "Only_32"
-    df.loc[groups["inconsistent"], "Consistency_25_32"] = "Mismatch"
-
-    # ------------------------------------------------------------------
-    # 3. Split phenotype descriptions
-    # ------------------------------------------------------------------
-    desc_col = PHENOTYPE_DESC_COL
-
-    # Consistent at both temperatures — split on "25,32"
-    both_idx = df[groups["both"]].index
-    both_split = split_basic_additional(df.loc[both_idx, desc_col], f" {TEMP_BOTH}")
-    df.loc[both_idx, "Basic phenotype"] = both_split["Basic phenotype"]
-    df.loc[both_idx, "Additional phenotype"] = both_split["Additional phenotype"]
-
-    # Only at 32°C — split on " 32"
-    only32_idx = df[groups["only_32"]].index
-    only32_split = split_basic_additional(df.loc[only32_idx, desc_col], f" {TEMP_32}")
-    df.loc[only32_idx, "Basic phenotype"] = only32_split["Basic phenotype"]
-    df.loc[only32_idx, "Additional phenotype"] = only32_split["Additional phenotype"]
-
-    # ------------------------------------------------------------------
-    # 4. Classify one vs multi basic phenotypes
-    # ------------------------------------------------------------------
-    df["Phenotype_count"] = (
-        df["Basic phenotype"].apply(classify_phenotype_count)
+    both_index = out[groups["both"]].index
+    both_split = split_basic_additional(
+        out.loc[both_index, PHENOTYPE_DESC_COL],
+        f" {TEMP_BOTH}",
     )
+    out.loc[both_index, "Basic phenotype"] = both_split["Basic phenotype"]
+    out.loc[both_index, "Additional phenotype"] = both_split["Additional phenotype"]
 
-    # For temperature‑inconsistent genes, the phenotype cannot be split into
-    # basic/additional, so assign an explicit label instead of NaN.
-    df.loc[groups["inconsistent"], "Phenotype_count"] = (
-        "Temp_mismatch"
+    only32_index = out[groups["only_32"]].index
+    only32_split = split_basic_additional(
+        out.loc[only32_index, PHENOTYPE_DESC_COL],
+        f" {TEMP_32}",
     )
+    out.loc[only32_index, "Basic phenotype"] = only32_split["Basic phenotype"]
+    out.loc[only32_index, "Additional phenotype"] = only32_split["Additional phenotype"]
+    return out
 
-    # ------------------------------------------------------------------
-    # 5. Summary statistics
-    # ------------------------------------------------------------------
+
+def add_phenotype_count(
+    df: pd.DataFrame,
+    groups: dict[str, np.ndarray],
+) -> pd.DataFrame:
+    """Label single vs multiple growth-signal segments, or a temperature mismatch."""
+    counts = df["Basic phenotype"].map(classify_phenotype_count)
+    counts.loc[groups["inconsistent"]] = "Temp_mismatch"
+    return df.assign(Phenotype_count=counts)
+
+
+def log_summary(df: pd.DataFrame, groups: dict[str, np.ndarray]) -> None:
+    """Log group sizes and phenotype-count totals."""
     logger.info(f"Total genes: {len(df):,}")
     logger.info(f"  Consistent at both temp:  {groups['both'].sum():,}")
     logger.info(f"  Only at 32°C:             {groups['only_32'].sum():,}")
@@ -244,30 +230,58 @@ def main() -> int:
     logger.info(f"  Multi basic phenotypes:   {n_multi:,}")
     logger.info(f"  Temperature mismatch:     {n_temp_inconsistent:,}")
 
-    # ------------------------------------------------------------------
-    # 6. Save
-    # ------------------------------------------------------------------
-    output_path.parent.mkdir(parents=True, exist_ok=True)
 
+def write_grouped_workbook(output_path: Path, df: pd.DataFrame) -> None:
+    """Write the four grouped-gene sheets."""
     with pd.ExcelWriter(output_path) as writer:
-        # Sheet 1: All genes (total overview)
         df.to_excel(writer, sheet_name="All genes", index=False)
-
-        # Sheet 2: One basic phenotype
         df[df["Phenotype_count"] == "Single"].to_excel(
-            writer, sheet_name="One basic phenotype", index=False,
+            writer,
+            sheet_name="One basic phenotype",
+            index=False,
         )
-        # Sheet 3: Multi basic phenotypes
         df[df["Phenotype_count"] == "Multiple"].to_excel(
-            writer, sheet_name="Multi basic phenotypes", index=False,
+            writer,
+            sheet_name="Multi basic phenotypes",
+            index=False,
         )
-        # Sheet 4: Inconsistent phenotypes (drop split columns)
         inconsistent_df = df[df["Phenotype_count"] == "Temp_mismatch"].drop(
             columns=["Basic phenotype", "Additional phenotype"],
         )
-        inconsistent_df.to_excel(writer, sheet_name="Inconsistent phenotypes", index=False)
+        inconsistent_df.to_excel(
+            writer,
+            sheet_name="Inconsistent phenotypes",
+            index=False,
+        )
 
+
+def build_grouped_table(input_path: Path, output_path: Path) -> None:
+    """Load the phenotype table, group it by temperature consistency, and write it."""
+    logger.info(f"Loading formatted phenotypes: {input_path}")
+    df = pd.read_excel(input_path)
+    require_columns(df, REQUIRED_COLUMNS, input_path)
+    logger.info(f"Loaded {len(df):,} genes")
+
+    groups = identify_consistency_groups(df)
+    df = add_consistency_column(df, groups)
+    df = add_phenotype_splits(df, groups)
+    df = add_phenotype_count(df, groups)
+    log_summary(df, groups)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    write_grouped_workbook(output_path, df)
     logger.success(f"Grouped genes saved: {output_path}")
+
+
+def main() -> int:
+    """Run the grouping and propagate fatal errors as exit code 1."""
+    args = parse_args()
+    setup_logger(log_level="DEBUG" if args.verbose else "INFO")
+    try:
+        build_grouped_table(args.input.resolve(), args.output.resolve())
+    except Exception as error:
+        logger.exception(f"Gene grouping failed: {error}")
+        return 1
     return 0
 
 

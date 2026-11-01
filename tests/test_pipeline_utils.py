@@ -6,14 +6,33 @@ pin the tier-1 semantics (most depleted first) and the gRNA sign flip.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pandas as pd
+import pytest
 
 from pipeline_utils import (
     category_dr_medians,
     dr_tier_map,
     load_dit_hap,
     load_grna,
+    require_columns,
+    require_sheets,
 )
+
+
+def test_require_columns_rejects_missing_columns():
+    df = pd.DataFrame({"present": [1]})
+
+    with pytest.raises(ValueError, match="missing required columns"):
+        require_columns(df, ("present", "absent"), Path("input.tsv"))
+
+
+def test_require_sheets_rejects_missing_sheets():
+    sheets = {"Present": pd.DataFrame()}
+
+    with pytest.raises(ValueError, match="missing required sheets"):
+        require_sheets(sheets, ("Present", "Absent"), Path("input.xlsx"))
 
 
 def test_category_dr_medians_sorted_most_depleted_first():
@@ -38,12 +57,8 @@ def test_category_dr_medians_sorted_most_depleted_first():
 
 
 def test_category_dr_medians_tier_one_is_most_negative():
-    df = pd.DataFrame(
-        {"Systematic ID": ["a", "b"], "Category": ["X", "Y"]}
-    )
-    dit_hap = pd.DataFrame(
-        {"Systematic ID": ["a", "b"], "DR": [-2.0, 0.5]}
-    )
+    df = pd.DataFrame({"Systematic ID": ["a", "b"], "Category": ["X", "Y"]})
+    dit_hap = pd.DataFrame({"Systematic ID": ["a", "b"], "DR": [-2.0, 0.5]})
 
     medians = category_dr_medians(df, dit_hap)
     tier_map = {cat: i + 1 for i, cat in enumerate(medians.index)}
@@ -74,10 +89,7 @@ def test_dr_tier_map_orders_categories():
 def test_load_dit_hap_drops_null_dr(tmp_path):
     path = tmp_path / "dit_hap.tsv"
     path.write_text(
-        "Systematic ID\tDR\n"
-        "SPAC1.01\t-0.5\n"
-        "SPAC1.02\t\n"
-        "SPAC1.03\t-1.2\n",
+        "Systematic ID\tDR\nSPAC1.01\t-0.5\nSPAC1.02\t\nSPAC1.03\t-1.2\n",
         encoding="utf-8",
     )
 
@@ -90,10 +102,7 @@ def test_load_dit_hap_drops_null_dr(tmp_path):
 def test_load_grna_negates_um_and_drops_nulls(tmp_path):
     path = tmp_path / "grna.tsv"
     path.write_text(
-        "Systematic ID\tum\n"
-        "SPAC1.01\t0.8\n"
-        "SPAC1.02\t\n"
-        "SPAC1.03\t-0.2\n",
+        "Systematic ID\tum\nSPAC1.01\t0.8\nSPAC1.02\t\nSPAC1.03\t-0.2\n",
         encoding="utf-8",
     )
 

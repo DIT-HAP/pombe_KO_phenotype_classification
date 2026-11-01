@@ -52,9 +52,10 @@ Version:  4.0.0
 # IMPORTS
 # =============================================================================
 # 1. Standard Library Imports
-import json
 from dataclasses import dataclass
+import json
 from pathlib import Path
+from typing import Any
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -68,7 +69,7 @@ DEFAULT_CONFIG = Path("data/4_categorized_genes/category_revisions.json")
 # =============================================================================
 
 
-@dataclass(frozen=True)
+@dataclass(kw_only=True, frozen=True)
 class CategoryConfig:
     """Draw order for both figures plus the Sub_category -> Category merges."""
 
@@ -86,7 +87,7 @@ class CategoryConfig:
 # =============================================================================
 
 
-def _string_list(data: dict, key: str, path: Path) -> list[str]:
+def _string_list(data: dict[str, Any], key: str, path: Path) -> list[str]:
     """Validate that ``data[key]`` is a list of unique non-empty strings."""
     value = data.get(key)
     if not isinstance(value, list) or not all(isinstance(x, str) and x for x in value):
@@ -97,43 +98,27 @@ def _string_list(data: dict, key: str, path: Path) -> list[str]:
 
 
 def load_category_config(path: Path = DEFAULT_CONFIG) -> CategoryConfig:
-    """Load the category configuration JSON.
-
-    Args:
-        path: Path to the category configuration JSON file.
-
-    Returns:
-        ``CategoryConfig`` with ``sub_category_order``, ``revisions`` and
-        ``category_order``.
-
-    Raises:
-        FileNotFoundError: If ``path`` does not exist.
-        ValueError: If the structure or value types are invalid, or if the
-            revision mapping is not idempotent (a target is itself revised).
-    """
+    """Load and validate the category order and merge configuration JSON."""
     if not path.exists():
         raise FileNotFoundError(
-            f"Category config file not found: {path}. "
-            f"Expected {DEFAULT_CONFIG}."
+            f"Category config file not found: {path}. Expected {DEFAULT_CONFIG}."
         )
 
     with path.open(encoding="utf-8") as fh:
         data = json.load(fh)
 
     if not isinstance(data, dict):
-        raise ValueError(
-            f"Category config must be a JSON object, got {type(data).__name__}: {path}"
-        )
+        raise TypeError(f"Category config must be a JSON object, got {type(data).__name__}: {path}")
 
     sub_category_order = _string_list(data, "sub_category_order", path)
     category_order = _string_list(data, "category_order", path)
 
     revisions = data.get("revisions")
     if not isinstance(revisions, dict):
-        raise ValueError(f"Category config 'revisions' must be an object: {path}")
+        raise TypeError(f"Category config 'revisions' must be an object: {path}")
     for key, value in revisions.items():
         if not isinstance(key, str) or not isinstance(value, str):
-            raise ValueError(
+            raise TypeError(
                 f"Category revisions must map strings to strings; "
                 f"offending entry: {key!r} -> {value!r}"
             )

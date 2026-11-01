@@ -1,7 +1,7 @@
 """pytest configuration — add project src/ and scripts/ to sys.path."""
 
-import sys
 from pathlib import Path
+import sys
 
 ROOT = Path(__file__).resolve().parent.parent
 for folder in (ROOT / "scripts", ROOT / "src"):
