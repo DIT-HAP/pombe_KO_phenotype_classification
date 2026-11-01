@@ -30,29 +30,35 @@ Version: 2.1.0
 # IMPORTS
 # =============================================================================
 # 1. Standard Library Imports
-import re
 from pathlib import Path
+import re
 
-# 2. Data Processing Imports
-import pandas as pd
-
-# 3. Third-party Imports
+# 2. Third-party Imports
 from loguru import logger
+
+# 3. Data Processing Imports
+import pandas as pd
 
 # =============================================================================
 # GLOBAL CONSTANTS
 # =============================================================================
 
 DEFAULT_KIM2010 = Path("data/references/kim2010/kim2010_supp_table1.xls")
-DEFAULT_HAYLES2013 = Path(
-    "data/references/hayles2013/hayles2013_supp_table3.xlsx"
-)
+DEFAULT_HAYLES2013 = Path("data/references/hayles2013/hayles2013_supp_table3.xlsx")
 
 KIM_ID = "Systemic ID"  # sic: the published table spells it "Systemic"
 HAYLES_ID = "Systematic ID"
 HAYLES_STUDY = "Gene dispensability. This study"
 HAYLES_PHENOTYPE = "Phenotypic classification used for analysis"
 HAYLES_DESCRIPTION = "Deletion mutant phenotype description"
+
+# Accepted spellings of the two dispensability calls.
+DISPENSABILITY_CALLS: dict[str, str] = {
+    "V": "V",
+    "VIABLE": "V",
+    "E": "E",
+    "ESSENTIAL": "E",
+}
 
 
 # =============================================================================
@@ -77,12 +83,10 @@ def normalize_call(value: object) -> str | None:
     text = str(value).strip().upper()
     if not text or text == "NAN":
         return None
-    if text in {"V", "VIABLE"}:
-        return "V"
-    if text in {"E", "ESSENTIAL"}:
-        return "E"
-    logger.warning(f"Unrecognised dispensability call {value!r}; treating as missing")
-    return None
+    call = DISPENSABILITY_CALLS.get(text)
+    if call is None:
+        logger.warning(f"Unrecognised dispensability call {value!r}; treating as missing")
+    return call
 
 
 def clean_text_column(series: pd.Series) -> pd.Series:
@@ -95,7 +99,6 @@ def clean_text_column(series: pd.Series) -> pd.Series:
 # =============================================================================
 
 
-@logger.catch(reraise=True)
 def load_kim2010(path: Path) -> pd.DataFrame:
     """Load Kim 2010 full Supplementary Table 1 into the live contract.
 
@@ -105,10 +108,10 @@ def load_kim2010(path: Path) -> pd.DataFrame:
     df = pd.read_excel(path, sheet_name=0)
     df.columns = [str(c).strip() for c in df.columns]
 
-    required = [KIM_ID, "Paralog"]
-    missing = [c for c in required if c not in df.columns]
+    required = {KIM_ID, "Paralog"}
+    missing = required - set(df.columns)
     if missing:
-        raise ValueError(f"{path}: missing columns {missing}")
+        raise ValueError(f"{path}: missing columns {sorted(missing)}")
 
     out = pd.DataFrame(
         {
@@ -126,20 +129,19 @@ def load_kim2010(path: Path) -> pd.DataFrame:
     return out
 
 
-@logger.catch(reraise=True)
 def load_hayles2013(path: Path) -> pd.DataFrame:
     """Load the Hayles 2013 main supplementary table into the live contract."""
     df = pd.read_excel(path, sheet_name=0)
     df.columns = [str(c).strip() for c in df.columns]
-    required = [
+    required = {
         HAYLES_ID,
         HAYLES_STUDY,
         HAYLES_PHENOTYPE,
         HAYLES_DESCRIPTION,
-    ]
-    missing = [c for c in required if c not in df.columns]
+    }
+    missing = required - set(df.columns)
     if missing:
-        raise ValueError(f"{path}: missing columns {missing}")
+        raise ValueError(f"{path}: missing columns {sorted(missing)}")
 
     out = pd.DataFrame(
         {
@@ -179,13 +181,8 @@ def collapse_duplicate_ids(
             continue
 
         # Prefer the row whose original ID is already the current ID.
-        primary_mask = (
-            group[original_id_col].astype("string").str.upper()
-            == str(gene_id).upper()
-        )
-        primary = (
-            group.loc[primary_mask].iloc[0] if primary_mask.any() else group.iloc[0]
-        )
+        primary_mask = group[original_id_col].astype("string").str.upper() == str(gene_id).upper()
+        primary = group.loc[primary_mask].iloc[0] if primary_mask.any() else group.iloc[0]
         row = primary.copy()
 
         orig_ids = list(dict.fromkeys(str(value) for value in group[original_id_col]))

@@ -61,16 +61,15 @@ TEMPERATURE_VARIANTS = (
 def format_hayles_phenotypes(df: pd.DataFrame) -> pd.DataFrame:
     """Clean Hayles phenotype text in the canonical loader columns."""
     out = df.copy()
-    out[RAW_PHENOTYPE_DESC_COL] = (
-        out[RAW_PHENOTYPE_DESC_COL]
-        .str.strip()
-        .str.strip(".")
-        .str.strip()
-    )
+    out[RAW_PHENOTYPE_DESC_COL] = out[RAW_PHENOTYPE_DESC_COL].str.strip().str.strip(".").str.strip()
     out[RAW_MORPHOLOGY_COL] = out[RAW_MORPHOLOGY_COL].str.strip()
     out[RAW_DISPENSABILITY_COL] = out[RAW_DISPENSABILITY_COL].str.strip()
 
     for old, new in TEMPERATURE_VARIANTS:
-        out.replace(to_replace=old, value=new, regex=True, inplace=True)
+        out[RAW_PHENOTYPE_DESC_COL] = out[RAW_PHENOTYPE_DESC_COL].str.replace(
+            old,
+            new,
+            regex=True,
+        )
 
     return out
