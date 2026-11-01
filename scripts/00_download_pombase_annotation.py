@@ -32,8 +32,10 @@ Output
 Usage
 -----
     mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py
-    mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py --release 2026-05-01
-    mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py --force --verbose
+    mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py \
+        --release 2026-05-01
+    mamba run -n bioinformatics python scripts/00_download_pombase_annotation.py \
+        --force --verbose
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-06-08
@@ -45,8 +47,9 @@ Version:  1.0.0
 # =============================================================================
 # 1. Standard Library Imports
 import argparse
-import sys
+from dataclasses import dataclass
 from pathlib import Path
+import sys
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -60,7 +63,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 # 4. Local Imports
-from pipeline_utils import DEFAULT_RELEASE, setup_logger
+from pipeline_utils import DEFAULT_RELEASE, setup_logger  # noqa: E402
 
 # =============================================================================
 # GLOBAL CONSTANTS
@@ -77,11 +80,17 @@ POMBASE_URL_TEMPLATE = (
 )
 
 # =============================================================================
-# LOGGING SETUP
+# CONFIGURATION & DATACLASSES
 # =============================================================================
 
 
-setup_logger()
+@dataclass(kw_only=True, frozen=True)
+class FileStats:
+    """Columns and data-row count read from a downloaded annotation file."""
+
+    columns: list[str]
+    data_lines: int
+
 
 # =============================================================================
 # CORE LOGIC
@@ -121,12 +130,8 @@ def download_file(url: str, dst: Path) -> int:
     return len(content)
 
 
-def inspect_file(path: Path) -> dict:
-    """Print file statistics; returns metadata dict for downstream use."""
-    if not path.exists():
-        logger.warning(f"File not found: {path}")
-        return {}
-
+def inspect_file(path: Path) -> FileStats:
+    """Log annotation-file statistics and return its columns and data-row count."""
     file_size = path.stat().st_size
     logger.info(f"File size: {file_size:,} bytes ({file_size / 1024 / 1024:.2f} MB)")
 
@@ -157,15 +162,7 @@ def inspect_file(path: Path) -> dict:
         total_lines = sum(1 for _ in f)
     data_lines = total_lines - comment_lines - 1  # subtract comments + header
     logger.info(f"Total lines: {total_lines:,} (≈{data_lines:,} data rows)")
-
-    return {
-        "path": str(path),
-        "file_size": file_size,
-        "total_lines": total_lines,
-        "data_lines": data_lines,
-        "columns": columns,
-        "release": path.stem.replace("pombase-", "").replace("_gene_IDs_names_products", ""),
-    }
+    return FileStats(columns=columns, data_lines=data_lines)
 
 
 # =============================================================================
@@ -207,9 +204,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     """Main orchestrator."""
     args = parse_args()
-
-    if args.verbose:
-        setup_logger(log_level="DEBUG")
+    setup_logger(log_level="DEBUG" if args.verbose else "INFO")
 
     outdir = args.outdir.resolve()
     url = build_url(args.release)
@@ -227,15 +222,16 @@ def main() -> int:
     # Download
     try:
         bytes_downloaded = download_file(url, dst)
-        logger.info(f"Downloaded: {bytes_downloaded:,} bytes ({bytes_downloaded / 1024 / 1024:.2f} MB)")
+        megabytes = bytes_downloaded / 1024 / 1024
+        logger.info(f"Downloaded: {bytes_downloaded:,} bytes ({megabytes:.2f} MB)")
 
-        metadata = inspect_file(dst)
+        stats = inspect_file(dst)
         logger.info(
             f"Annotation file saved to: {dst} "
-            f"({len(metadata.get('columns', []))} columns, {metadata.get('data_lines', 0)} rows)",
+            f"({len(stats.columns)} columns, {stats.data_lines} rows)",
         )
-    except (RuntimeError, URLError, OSError) as e:
-        logger.error(f"Download failed: {e}")
+    except Exception as error:
+        logger.exception(f"Download failed: {error}")
         if dst.exists():
             dst.unlink()
         return 1
