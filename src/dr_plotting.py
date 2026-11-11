@@ -208,6 +208,12 @@ def stats_columns(spec: FigureSpec) -> tuple[list[tuple[float, float]], float]:
     return edges, cursor
 
 
+def rows_below_count(order: list[str], frame: pd.DataFrame, min_n: int) -> frozenset[str]:
+    """Rows of ``order`` holding fewer than ``min_n`` observations in ``frame``."""
+    counts = frame[ROW_COL].value_counts()
+    return frozenset(row for row in order if int(counts.get(row, 0)) < min_n)
+
+
 def adjacent_pairs(order: list[str], panels: list[Panel]) -> list[tuple[str, str]]:
     """Adjacent category pairs holding at least two observations in every panel."""
     counts = [panel.frame[ROW_COL].value_counts() for panel in panels]

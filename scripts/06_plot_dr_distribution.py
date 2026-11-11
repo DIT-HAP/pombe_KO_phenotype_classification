@@ -27,11 +27,16 @@ white box the median/IQR. The two proxies do not cover the same genes (gRNA has
 differ between panels A and B — panel C reports them separately rather than as
 one shared ``(n = … / …)``.
 
-Two figures are produced:
+Four figures are produced:
 
 - **original** — fine-grained ``Sub_category`` rows, filled by their merged
   group. Rows of one merged category are kept together and the groups follow
   the merged-category draw order, with dashed dividers between them.
+- **original low-n** — only the original rows whose DIT-HAP sample size is
+  below 10, drawn exactly like the original figure.
+- **original no-low-n** — the original figure with those rows dropped and the
+  dividers rebuilt between the surviving merged categories. The two variants
+  separate the low-sample rows from the rows that stand on their own n.
 - **revised** — merged ``Category`` rows with two-sided Mann-Whitney U
   brackets between adjacent categories (raw p-values, no multiple-comparison
   correction). Every bracket sits on one vertical
@@ -57,6 +62,8 @@ Input
 Output
 ------
 - ``results/DR_um_distribution_original.{png,pdf}`` — 2621 x 1825 px
+- ``results/DR_um_distribution_original_low_n.{png,pdf}`` — 2519 x 860 px
+- ``results/DR_um_distribution_original_no_low_n.{png,pdf}`` — 2461 x 1087 px
 - ``results/DR_um_distribution_revised.{png,pdf}`` — 2017 x 594 px
 
 Each violin axes is 200 px wide at the 288 dpi savefig default (50 pt); height
@@ -64,7 +71,7 @@ grows with the row count. Text keeps ``cnsplots``' default sizes. Width, unlike
 height, is content-tight: the export crops to the drawn extent, so the row
 labels and the stats table set the final canvas width.
 
-Every element of both figures — axis labels, tick labels and panel C's table
+Every element of the figures — axis labels, tick labels and panel C's table
 alike — is set in one face, Arial (``FONT_FAMILY``).
 
 Usage
@@ -74,7 +81,7 @@ Usage
 
 Author:   Yusheng Yang (guidance) + Claude Code (implementation)
 Date:     2026-10-13
-Version:  1.0.0
+Version:  1.2.0
 """
 
 # =============================================================================
@@ -83,6 +90,8 @@ Version:  1.0.0
 
 # 1. Standard Library Imports
 import argparse
+from dataclasses import replace
+from itertools import pairwise
 from pathlib import Path
 import sys
 
@@ -142,6 +151,7 @@ from dr_plotting import (  # noqa: E402
     draw_stats_panel,
     log_category_stats,
     log_pvalues,
+    rows_below_count,
     stats_columns,
 )
 from pipeline_utils import (  # noqa: E402
@@ -166,6 +176,10 @@ REQUIRED_COLUMNS: tuple[str, ...] = (ID_COL, SUB_CATEGORY_COL, CATEGORY_COL)
 # cnsplots' default sizes, so a row only has to clear one 7 pt tick label.
 ORIGINAL_ROW_HEIGHT_PT = 14.2
 REVISED_ROW_HEIGHT_PT = 16.89
+
+# Rows whose DIT-HAP sample size falls below DIT_HAP_MIN_N are split out of
+# the original figure into their own low-n figure.
+DIT_HAP_MIN_N = 10
 
 # Cell journal qualitative palette. Each merged category takes the slot its
 # canonical category order fixes, so a category keeps one colour in every figure.
@@ -457,6 +471,32 @@ def build_original_spec(
     )
 
 
+def restrict_spec(spec: FigureSpec, kept: frozenset[str], name: str, stem: str) -> FigureSpec:
+    """Copy spec keeping only ``kept`` rows, their observations and rebuilt dividers."""
+    panels = [
+        replace(panel, frame=panel.frame.loc[panel.frame[ROW_COL].isin(kept)].copy())
+        for panel in spec.panels
+    ]
+    row_order = [row for row in spec.row_order if row in kept]
+    row_groups = {row: spec.row_groups[row] for row in row_order}
+    # Surviving rows keep their relative order, so a divider sits wherever two
+    # consecutive survivors come from different merged categories.
+    boundaries = [
+        index + 0.5
+        for index, (row, next_row) in enumerate(pairwise(row_order))
+        if row_groups[row] != row_groups[next_row]
+    ]
+    return replace(
+        spec,
+        name=name,
+        row_order=row_order,
+        panels=panels,
+        row_groups=row_groups,
+        boundaries=boundaries,
+        output_path=spec.output_path.with_name(f"{stem}.png"),
+    )
+
+
 def build_revised_spec(
     merged: pd.DataFrame,
     dit_hap: pd.DataFrame,
@@ -517,10 +557,25 @@ def main() -> int:
         config = load_category_config(args.revisions)
         logger.info(f"  {len(config.revisions)} sub-category merges configured")
 
-        specs = [
-            build_original_spec(merged, dit_hap, grna, config, args.output_dir),
-            build_revised_spec(merged, dit_hap, grna, config, args.output_dir),
+        original = build_original_spec(merged, dit_hap, grna, config, args.output_dir)
+        # panels[0] is the DIT-HAP panel; its per-row n splits the original
+        # figure into the low-n rows and everything else.
+        low_n = rows_below_count(original.row_order, original.panels[0].frame, DIT_HAP_MIN_N)
+        variants = [
+            (low_n, "Sub_category (DIT-HAP n < 10)", "DR_um_distribution_original_low_n"),
+            (
+                frozenset(original.row_order) - low_n,
+                "Sub_category (DIT-HAP n ≥ 10)",
+                "DR_um_distribution_original_no_low_n",
+            ),
         ]
+        specs = [original]
+        specs += [
+            restrict_spec(original, kept, name=name, stem=stem)
+            for kept, name, stem in variants
+            if kept
+        ]
+        specs.append(build_revised_spec(merged, dit_hap, grna, config, args.output_dir))
 
         all_frames = [panel.frame for spec in specs for panel in spec.panels]
         group_order = build_group_order(all_frames, config.category_order)

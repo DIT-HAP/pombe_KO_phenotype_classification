@@ -51,6 +51,10 @@ pombe_KO_phenotype_classification/
 │   ├── Hayles_2013_OB_merged_categories.xlsx
 │   ├── DR_um_distribution_original.png
 │   ├── DR_um_distribution_original.pdf
+│   ├── DR_um_distribution_original_low_n.png
+│   ├── DR_um_distribution_original_low_n.pdf
+│   ├── DR_um_distribution_original_no_low_n.png
+│   ├── DR_um_distribution_original_no_low_n.pdf
 │   ├── DR_um_distribution_revised.png
 │   ├── DR_um_distribution_revised.pdf
 │   ├── DR_um_distribution_pure.png

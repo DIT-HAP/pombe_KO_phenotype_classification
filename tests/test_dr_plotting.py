@@ -10,6 +10,7 @@ from dr_plotting import (
     VALUE_COL,
     build_long_frame,
     format_pvalue,
+    rows_below_count,
 )
 
 
@@ -64,3 +65,12 @@ def test_build_long_frame_with_group():
 
     assert list(frame.columns) == [VALUE_COL, ROW_COL, GROUP_COL]
     assert frame[GROUP_COL].tolist() == ["g"]
+
+
+def test_rows_below_count():
+    frame = pd.DataFrame({ROW_COL: ["x", "x", "y"], VALUE_COL: [-1.0, -2.0, -3.0]})
+
+    masked = rows_below_count(["x", "y", "z"], frame, min_n=2)
+
+    # z is absent from the frame (n=0), x sits exactly at the threshold.
+    assert masked == frozenset({"y", "z"})
