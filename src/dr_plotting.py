@@ -3,8 +3,8 @@ Shared DR / um plotting primitives
 ==================================
 
 Helpers shared by ``06_plot_dr_distribution.py`` and
-``07_plot_dr_distribution_pure.py``: long-form data preparation, the
-stats-table columns, and the p-value brackets. The figure-specific pieces —
+``07_plot_dr_distribution_pure.py``: long-form data preparation, row ordering,
+the stats-table columns, and the p-value brackets. The figure-specific pieces —
 ``draw_figure``, colour palettes, row selection and spec builders — stay in
 each script.
 
@@ -122,7 +122,6 @@ class FigureSpec:
     pvalue_note: str | None
     row_height_pt: float
     row_groups: dict[str, str] = field(default_factory=dict)
-    boundaries: list[float] = field(default_factory=list)
     show_legend: bool = False
 
 
@@ -212,6 +211,12 @@ def rows_below_count(order: list[str], frame: pd.DataFrame, min_n: int) -> froze
     """Rows of ``order`` holding fewer than ``min_n`` observations in ``frame``."""
     counts = frame[ROW_COL].value_counts()
     return frozenset(row for row in order if int(counts.get(row, 0)) < min_n)
+
+
+def order_rows_by_median(order: list[str], frame: pd.DataFrame) -> list[str]:
+    """Order rows by ascending median of ``frame``, rows without values last."""
+    medians = frame.groupby(ROW_COL)[VALUE_COL].median()
+    return sorted(order, key=lambda row: medians.get(row, float("inf")))
 
 
 def adjacent_pairs(order: list[str], panels: list[Panel]) -> list[tuple[str, str]]:

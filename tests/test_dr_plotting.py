@@ -10,6 +10,7 @@ from dr_plotting import (
     VALUE_COL,
     build_long_frame,
     format_pvalue,
+    order_rows_by_median,
     rows_below_count,
 )
 
@@ -74,3 +75,17 @@ def test_rows_below_count():
 
     # z is absent from the frame (n=0), x sits exactly at the threshold.
     assert masked == frozenset({"y", "z"})
+
+
+def test_order_rows_by_median_sorts_ascending_with_missing_last():
+    frame = pd.DataFrame(
+        {
+            ROW_COL: ["x", "x", "y", "y", "z", "z"],
+            VALUE_COL: [1.0, 1.0, -2.0, -2.0, 0.0, 0.0],
+        }
+    )
+
+    ordered = order_rows_by_median(["x", "y", "w", "z"], frame)
+
+    # w has no observation, so it sorts after every measured row.
+    assert ordered == ["y", "z", "x", "w"]

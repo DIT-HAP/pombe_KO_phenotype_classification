@@ -3,8 +3,8 @@ Category Configuration — Order and Merges
 ==========================================
 
 Single source of truth for how the fine-grained ``Sub_category`` labels (step
-04) map to merged ``Category`` labels, and for the draw order of both figures
-(step 06).
+04) map to merged ``Category`` labels, for the canonical sub-category order,
+and for the revised figure's draw order (step 06).
 
 The file has three explicit sections::
 
@@ -14,8 +14,9 @@ The file has three explicit sections::
       "category_order": ["spores", "germinated", "divided", ...]
     }
 
-- ``sub_category_order`` — draw order for the original figure (one row per
-  ``Sub_category``). Categories present in the data but not listed are appended.
+- ``sub_category_order`` — canonical order of the ``Sub_category`` rows. The
+  original figure sorts them by DIT-HAP median, so this list only breaks ties.
+  Categories present in the data but not listed are appended.
 - ``revisions`` — the ``Sub_category -> Category`` merges used by step 05 and
   for grouping in step 06. Only changed sub-categories are listed.
 - ``category_order`` — draw order for the revised figure (one row per merged
@@ -71,7 +72,7 @@ DEFAULT_CONFIG = Path("data/4_categorized_genes/category_revisions.json")
 
 @dataclass(kw_only=True, frozen=True)
 class CategoryConfig:
-    """Draw order for both figures plus the Sub_category -> Category merges."""
+    """Canonical sub-category order, merge map, and revised-category draw order."""
 
     sub_category_order: list[str]
     revisions: dict[str, str]

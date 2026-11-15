@@ -49,12 +49,18 @@ pombe_KO_phenotype_classification/
 │   └── 5_merged_categories/ final merged table + summaries
 ├── results/
 │   ├── Hayles_2013_OB_merged_categories.xlsx
-│   ├── DR_um_distribution_original.png
-│   ├── DR_um_distribution_original.pdf
-│   ├── DR_um_distribution_original_low_n.png
-│   ├── DR_um_distribution_original_low_n.pdf
-│   ├── DR_um_distribution_original_no_low_n.png
-│   ├── DR_um_distribution_original_no_low_n.pdf
+│   ├── DR_um_distribution_original_by_DR.png
+│   ├── DR_um_distribution_original_by_DR.pdf
+│   ├── DR_um_distribution_original_by_um.png
+│   ├── DR_um_distribution_original_by_um.pdf
+│   ├── DR_um_distribution_original_low_n_by_DR.png
+│   ├── DR_um_distribution_original_low_n_by_DR.pdf
+│   ├── DR_um_distribution_original_low_n_by_um.png
+│   ├── DR_um_distribution_original_low_n_by_um.pdf
+│   ├── DR_um_distribution_original_no_low_n_by_DR.png
+│   ├── DR_um_distribution_original_no_low_n_by_DR.pdf
+│   ├── DR_um_distribution_original_no_low_n_by_um.png
+│   ├── DR_um_distribution_original_no_low_n_by_um.pdf
 │   ├── DR_um_distribution_revised.png
 │   ├── DR_um_distribution_revised.pdf
 │   ├── DR_um_distribution_pure.png

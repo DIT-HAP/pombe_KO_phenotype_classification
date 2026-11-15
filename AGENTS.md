@@ -131,12 +131,13 @@ mamba run -n bioinformatics ty check \
     in `04`/`05`. Test expectations use signal tiers.
 - `germination` (noun) is intentionally **not** a growth signal — it appears
   only in morphological contexts; the adjective `germinated` is the signal.
-- Both figure draw orders and the `Sub_category → Category` merges live in
-  `data/4_categorized_genes/category_revisions.json`
-  (`sub_category_order` / `revisions` / `category_order`). Edit that JSON to
-  reorder the figures or change merges; there is no hardcoded order constant.
-  Categories present in the data but missing from an order list are appended,
-  not dropped.
+- The revised figure's draw order and the `Sub_category → Category` merges
+  live in `data/4_categorized_genes/category_revisions.json`
+  (`sub_category_order` / `revisions` / `category_order`). The original
+  figures sort rows by ascending DIT-HAP median; `sub_category_order` only
+  breaks ties there. Edit that JSON to reorder the revised figure or change
+  merges; there is no hardcoded order constant. Categories present in the
+  data but missing from an order list are appended, not dropped.
 
 ## Data gotchas
 
@@ -198,9 +199,11 @@ mamba run -n bioinformatics ty check \
     four footnotes). The archived `01_format_and_update_ids.py` validates its `published_data` /
     `our_data` / `final_judgment` columns against Kim Table S1 at runtime.
   - `data/4_categorized_genes/category_revisions.json` — single source of truth for
-    both figure draw orders and the `Sub_category → Category` merge used by
-    `05`/`06`. Three sections: `sub_category_order`, `revisions`, `category_order`.
-    Edit this JSON directly. The old
+    the `Sub_category → Category` merge and order lists used by `05`/`06`.
+    Three sections: `sub_category_order` (canonical sub-category order; the
+    original figures sort by DIT-HAP median and use it only for ties),
+    `revisions`, `category_order` (revised figure draw order). Edit this JSON
+    directly. The old
     `Hayles_2013_OB_inspection_phenotypes_category_revised_20260707.xlsx` is
     frozen; no script reads it anymore.
 - `data/arc/` and `scripts/arc/` are the **deprecated previous implementation**,

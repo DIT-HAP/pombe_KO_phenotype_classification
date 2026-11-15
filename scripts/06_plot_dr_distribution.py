@@ -27,17 +27,20 @@ white box the median/IQR. The two proxies do not cover the same genes (gRNA has
 differ between panels A and B — panel C reports them separately rather than as
 one shared ``(n = … / …)``.
 
-Four figures are produced:
+Seven figures are produced. Every ``Sub_category`` variant comes in two sort
+orders — ``by_DR`` (ascending DIT-HAP median) and ``by_um`` (ascending gRNA
+median) — so either proxy can define the row order; rows without a value in
+the sort proxy come last.
 
-- **original** — fine-grained ``Sub_category`` rows, filled by their merged
-  group. Rows of one merged category are kept together and the groups follow
-  the merged-category draw order, with dashed dividers between them.
-- **original low-n** — only the original rows whose DIT-HAP sample size is
-  below 10, drawn exactly like the original figure.
-- **original no-low-n** — the original figure with those rows dropped and the
-  dividers rebuilt between the surviving merged categories. The two variants
-  separate the low-sample rows from the rows that stand on their own n.
-- **revised** — merged ``Category`` rows with two-sided Mann-Whitney U
+- **original by DR / by um** — all fine-grained ``Sub_category`` rows, filled
+  by their merged group (the colour key maps each row back to its group).
+- **original low-n by DR / by um** — only the rows whose DIT-HAP sample size
+  is below 10.
+- **original no-low-n by DR / by um** — the rows whose DIT-HAP sample size is
+  at least 10. The two variants separate the low-sample rows from the rows
+  that stand on their own n.
+- **revised** — merged ``Category`` rows built only from the sub-categories
+  kept by that same cutoff (DIT-HAP n ≥ 10), with two-sided Mann-Whitney U
   brackets between adjacent categories (raw p-values, no multiple-comparison
   correction). Every bracket sits on one vertical
   column right of its panel, labelled with the exact p-value: red and bold
@@ -57,13 +60,17 @@ Input
 - ``data/raw/260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv``
   — ``Systematic ID`` and ``um`` (negated on load).
 - ``data/4_categorized_genes/category_revisions.json``
-  — draw orders plus the ``Sub_category -> Category`` merges.
+  — canonical sub-category order, category draw order, and the
+  ``Sub_category -> Category`` merges.
 
 Output
 ------
-- ``results/DR_um_distribution_original.{png,pdf}`` — 2621 x 1825 px
-- ``results/DR_um_distribution_original_low_n.{png,pdf}`` — 2519 x 860 px
-- ``results/DR_um_distribution_original_no_low_n.{png,pdf}`` — 2461 x 1087 px
+- ``results/DR_um_distribution_original_by_DR.{png,pdf}`` — 2397 x 1825 px
+- ``results/DR_um_distribution_original_by_um.{png,pdf}`` — 2397 x 1825 px
+- ``results/DR_um_distribution_original_low_n_by_DR.{png,pdf}`` — 2295 x 860 px
+- ``results/DR_um_distribution_original_low_n_by_um.{png,pdf}`` — 2295 x 860 px
+- ``results/DR_um_distribution_original_no_low_n_by_DR.{png,pdf}`` — 2237 x 1087 px
+- ``results/DR_um_distribution_original_no_low_n_by_um.{png,pdf}`` — 2237 x 1087 px
 - ``results/DR_um_distribution_revised.{png,pdf}`` — 2017 x 594 px
 
 Each violin axes is 200 px wide at the 288 dpi savefig default (50 pt); height
@@ -81,7 +88,7 @@ Usage
 
 Author:   Yusheng Yang (guidance) + Claude Code (implementation)
 Date:     2026-10-13
-Version:  1.2.0
+Version:  1.3.0
 """
 
 # =============================================================================
@@ -91,7 +98,6 @@ Version:  1.2.0
 # 1. Standard Library Imports
 import argparse
 from dataclasses import replace
-from itertools import pairwise
 from pathlib import Path
 import sys
 
@@ -151,6 +157,7 @@ from dr_plotting import (  # noqa: E402
     draw_stats_panel,
     log_category_stats,
     log_pvalues,
+    order_rows_by_median,
     rows_below_count,
     stats_columns,
 )
@@ -178,7 +185,8 @@ ORIGINAL_ROW_HEIGHT_PT = 14.2
 REVISED_ROW_HEIGHT_PT = 16.89
 
 # Rows whose DIT-HAP sample size falls below DIT_HAP_MIN_N are split out of
-# the original figure into their own low-n figure.
+# the original figure into their own low-n figure; the complement also feeds
+# the revised figure.
 DIT_HAP_MIN_N = 10
 
 # Cell journal qualitative palette. Each merged category takes the slot its
@@ -205,36 +213,6 @@ def build_group_order(frames: list[pd.DataFrame], category_order: list[str]) -> 
     present = set().union(*(set(frame[GROUP_COL]) for frame in frames))
     ordered = [cat for cat in category_order if cat in present]
     return ordered + sorted(present - set(ordered))
-
-
-def build_sub_category_rows(
-    panels: list[Panel],
-    sub_category_order: list[str],
-    category_order: list[str],
-    row_groups: dict[str, str],
-) -> tuple[list[str], list[float]]:
-    """Group sub-categories under their merged category and return row order plus dividers."""
-    # Both proxies must be represented: gRNA covers sub-categories DIT-HAP does not.
-    present = set().union(*(set(panel.frame[ROW_COL]) for panel in panels))
-    listed = [sub for sub in sub_category_order if sub in present]
-    listed += sorted(present - set(listed))
-
-    # Sub-categories keep their configured relative order inside each merged
-    # category; the groups themselves follow the merged-category draw order.
-    grouped: dict[str, list[str]] = {}
-    for sub in listed:
-        grouped.setdefault(row_groups[sub], []).append(sub)
-
-    groups = [group for group in category_order if group in grouped]
-    groups += sorted(set(grouped) - set(groups))
-
-    rows = [sub for group in groups for sub in grouped[group]]
-    boundaries = []
-    filled = 0
-    for group in groups[:-1]:
-        filled += len(grouped[group])
-        boundaries.append(filled - 0.5)
-    return rows, boundaries
 
 
 # =============================================================================
@@ -346,10 +324,6 @@ def draw_figure(spec: FigureSpec, colors: dict[str, str]) -> None:
     mp = cns.multipanel(max_width=canvas_width)
     axes = draw_violin_panels(mp, spec, colors, plot_height, margin_right)
 
-    for boundary in spec.boundaries:
-        for ax in axes:
-            ax.axhline(boundary, color="0.45", linewidth=0.6, linestyle=(0, (4, 2)), zorder=0)
-
     for index, panel in enumerate(spec.panels):
         if spec.pairs:
             annotate_pairs(
@@ -437,7 +411,7 @@ def build_original_spec(
     config: CategoryConfig,
     output_dir: Path,
 ) -> FigureSpec:
-    """Build the fine-grained Sub_category figure spec grouped by revised category."""
+    """Build the fine-grained Sub_category spec, initially ordered by DIT-HAP median."""
     working = merged.rename(columns={SUB_CATEGORY_COL: ROW_COL}).assign(
         **{GROUP_COL: lambda df: df[ROW_COL].map(config.apply)}
     )
@@ -453,47 +427,46 @@ def build_original_spec(
             short_label="um",
         ),
     ]
+    # Both proxies must be represented: gRNA covers sub-categories DIT-HAP does not.
+    present = set().union(*(set(panel.frame[ROW_COL]) for panel in panels))
+    listed = [sub for sub in config.sub_category_order if sub in present]
+    row_order = order_rows_by_median(listed + sorted(present - set(listed)), panels[0].frame)
     row_groups = working.drop_duplicates(ROW_COL).set_index(ROW_COL)[GROUP_COL].to_dict()
-    row_order, boundaries = build_sub_category_rows(
-        panels, config.sub_category_order, config.category_order, row_groups
-    )
     return FigureSpec(
         name="Sub_category",
         row_order=row_order,
         row_groups=row_groups,
         panels=panels,
-        boundaries=boundaries,
         pairs=[],
-        output_path=output_dir / "DR_um_distribution_original.png",
+        output_path=output_dir / "DR_um_distribution_original_by_DR.png",
         show_legend=True,
         pvalue_note=None,
         row_height_pt=ORIGINAL_ROW_HEIGHT_PT,
     )
 
 
-def restrict_spec(spec: FigureSpec, kept: frozenset[str], name: str, stem: str) -> FigureSpec:
-    """Copy spec keeping only ``kept`` rows, their observations and rebuilt dividers."""
+def restrict_spec(spec: FigureSpec, kept: frozenset[str], name: str) -> FigureSpec:
+    """Copy spec keeping only ``kept`` rows and their observations."""
     panels = [
         replace(panel, frame=panel.frame.loc[panel.frame[ROW_COL].isin(kept)].copy())
         for panel in spec.panels
     ]
+    # Survivors keep their relative order, so the median sort carries over.
     row_order = [row for row in spec.row_order if row in kept]
     row_groups = {row: spec.row_groups[row] for row in row_order}
-    # Surviving rows keep their relative order, so a divider sits wherever two
-    # consecutive survivors come from different merged categories.
-    boundaries = [
-        index + 0.5
-        for index, (row, next_row) in enumerate(pairwise(row_order))
-        if row_groups[row] != row_groups[next_row]
-    ]
+    return replace(spec, name=name, row_order=row_order, panels=panels, row_groups=row_groups)
+
+
+def sort_spec_by_median(
+    spec: FigureSpec, panel_index: int, stem: str, output_dir: Path
+) -> FigureSpec:
+    """Copy spec ordered by the chosen proxy's median and point it at ``stem_by_<proxy>``."""
+    panel = spec.panels[panel_index]
     return replace(
         spec,
-        name=name,
-        row_order=row_order,
-        panels=panels,
-        row_groups=row_groups,
-        boundaries=boundaries,
-        output_path=spec.output_path.with_name(f"{stem}.png"),
+        name=f"{spec.name} (by {panel.short_label})",
+        row_order=order_rows_by_median(spec.row_order, panel.frame),
+        output_path=output_dir / f"{stem}_by_{panel.short_label}.png",
     )
 
 
@@ -502,34 +475,33 @@ def build_revised_spec(
     dit_hap: pd.DataFrame,
     grna: pd.DataFrame,
     config: CategoryConfig,
+    kept: frozenset[str],
     output_dir: Path,
 ) -> FigureSpec:
-    """Build the merged Category figure spec with adjacent-pair p-value brackets."""
+    """Build the merged Category figure spec from the retained sub-categories."""
+    selected = merged.loc[merged[SUB_CATEGORY_COL].isin(kept)]
     panels = [
         Panel(
             frame=build_long_frame(
-                merged, dit_hap, "DR", row_col=CATEGORY_COL, group_col=CATEGORY_COL
+                selected, dit_hap, "DR", row_col=CATEGORY_COL, group_col=CATEGORY_COL
             ),
             xlabel="DR — DIT-HAP",
             short_label="DR",
         ),
         Panel(
             frame=build_long_frame(
-                merged, grna, "um", row_col=CATEGORY_COL, group_col=CATEGORY_COL
+                selected, grna, "um", row_col=CATEGORY_COL, group_col=CATEGORY_COL
             ),
             xlabel="um — gRNA",
             short_label="um",
         ),
     ]
-    present = set().union(*(set(panel.frame[ROW_COL]) for panel in panels))
-    row_order = [cat for cat in config.category_order if cat in present]
-    row_order += sorted(present - set(row_order))
+    row_order = build_group_order([panel.frame for panel in panels], config.category_order)
     return FigureSpec(
         name="Merged Category",
         row_order=row_order,
         row_groups={cat: cat for cat in row_order},
         panels=panels,
-        boundaries=[],
         pairs=adjacent_pairs(row_order, panels),
         output_path=output_dir / "DR_um_distribution_revised.png",
         show_legend=False,
@@ -559,23 +531,30 @@ def main() -> int:
 
         original = build_original_spec(merged, dit_hap, grna, config, args.output_dir)
         # panels[0] is the DIT-HAP panel; its per-row n splits the original
-        # figure into the low-n rows and everything else.
+        # figure into the low-n rows and the terms the revised figure keeps.
         low_n = rows_below_count(original.row_order, original.panels[0].frame, DIT_HAP_MIN_N)
+        kept = frozenset(original.row_order) - low_n
+        logger.info(
+            f"  {len(kept)} sub-categories with DIT-HAP n ≥ {DIT_HAP_MIN_N} "
+            "feed the no-low-n and revised figures"
+        )
         variants = [
+            (frozenset(original.row_order), "Sub_category", "DR_um_distribution_original"),
             (low_n, "Sub_category (DIT-HAP n < 10)", "DR_um_distribution_original_low_n"),
             (
-                frozenset(original.row_order) - low_n,
+                kept,
                 "Sub_category (DIT-HAP n ≥ 10)",
                 "DR_um_distribution_original_no_low_n",
             ),
         ]
-        specs = [original]
-        specs += [
-            restrict_spec(original, kept, name=name, stem=stem)
-            for kept, name, stem in variants
-            if kept
-        ]
-        specs.append(build_revised_spec(merged, dit_hap, grna, config, args.output_dir))
+        specs = []
+        for rows, name, stem in variants:
+            variant = restrict_spec(original, rows, name=name)
+            specs += [
+                sort_spec_by_median(variant, index, stem, args.output_dir)
+                for index in range(len(variant.panels))
+            ]
+        specs.append(build_revised_spec(merged, dit_hap, grna, config, kept, args.output_dir))
 
         all_frames = [panel.frame for spec in specs for panel in spec.panels]
         group_order = build_group_order(all_frames, config.category_order)
