@@ -55,7 +55,7 @@ GROUPED="data/3_grouped_genes/Hayles_2013_OB_grouped_genes.xlsx"
 CATEGORIZED="data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx"
 MERGED="data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx"
 RESULTS_MERGED="${RESULTS_DIR}/Hayles_2013_OB_merged_categories.xlsx"
-KEYWORD_PROFILE="data/2_keyword_profile/growth_tier_keyword_profile.xlsx"
+KEYWORD_PROFILE="data/2_keyword_profile/category_keyword_profile.xlsx"
 
 # Set from --release in main(); used by steps 00 and 01.
 ANNOTATION=""
@@ -176,10 +176,10 @@ step_description() {
     case "$1" in
         00) printf '%s' "Download the PomBase annotation" ;;
         01) printf '%s' "Format Hayles phenotypes (Kim paralogs)" ;;
-        02) printf '%s' "Profile keywords per Growth_tier" ;;
+        02) printf '%s' "Profile keywords per merged Category" ;;
         03) printf '%s' "Group genes by temperature consistency" ;;
         04) printf '%s' "Categorise growth phenotypes" ;;
-        05) printf '%s' "Merge categories and re-rank tiers" ;;
+        05) printf '%s' "Merge categories into the final table" ;;
         06) printf '%s' "Plot DR/um distributions (original + revised)" ;;
         07) printf '%s' "Plot the five pure categories" ;;
     esac
@@ -417,18 +417,12 @@ check_step_inputs() {
                 "produced by step 03" || missing=1
             require_file "$step" "$MANUAL_INCONSISTENT" \
                 "hand-curated manual annotations (tracked in git)" || missing=1
-            # Step 04 reads DIT_HAP through its DEFAULT_DIT_HAP constant;
-            # there is no --dit-hap flag.
-            require_file "$step" "$DIT_HAP" \
-                "fitted DIT-HAP parameters (data/raw/)" || missing=1
             ;;
         05)
             require_file "$step" "$CATEGORIZED" \
                 "produced by step 04" || missing=1
             require_file "$step" "$CATEGORY_REVISIONS" \
                 "hand-curated category orders and merges (tracked in git)" || missing=1
-            require_file "$step" "$DIT_HAP" \
-                "fitted DIT-HAP parameters (data/raw/)" || missing=1
             ;;
         06)
             require_file "$step" "$MERGED" \
@@ -531,8 +525,7 @@ run_step() {
             args=(--input "$CATEGORIZED"
                   --output "$MERGED"
                   --results "$RESULTS_MERGED"
-                  --revisions "$CATEGORY_REVISIONS"
-                  --dit-hap "$DIT_HAP")
+                  --revisions "$CATEGORY_REVISIONS")
             ;;
         06)
             args=(--merged "$MERGED"

@@ -10,9 +10,7 @@ Signals are detected independently from a phenotype description, then
 resolved into a fine-grained ``Category`` label and a **signal tier**
 (1-5). The signal tier reflects biological hierarchy (1=spores, 2=germinated,
 3=microcolonies, 4=small colonies, 5=WT-like) and is used internally for
-category sorting. The final ``Growth_tier`` in pipeline output is re-ranked
-by DIT-HAP DR median (see ``04_categorize_phenotypes.py`` and
-``05_merge_categories.py``).
+category sorting; it is not written to the pipeline output tables.
 
 Input
 -----
@@ -361,7 +359,7 @@ def _drop_implied(categories: list[str], desc_lower: str) -> list[str]:
 
 
 def classify_growth(description: str) -> tuple[str, int]:
-    """Return (category, growth_tier) for a phenotype description string.
+    """Return (category, signal_tier) for a phenotype description string.
 
     The description is split into comma segments. Each segment is scanned
     for growth signals:

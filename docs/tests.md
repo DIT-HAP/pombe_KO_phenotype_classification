@@ -16,9 +16,9 @@ mamba run -n bioinformatics python -m pytest tests/ -v
 - `tests/test_dr_plotting.py` — 3 tests (shared DR/um plotting helpers)
 - `tests/test_format_hayles_phenotypes.py` — 3 tests (annotation join)
 - `tests/test_id_mapping.py` — 11 tests (shared PomBase ID update, paralogs, names, notes)
-- `tests/test_keyword_profile.py` — 3 tests (data-derived tier labels + term table)
+- `tests/test_keyword_profile.py` — 2 tests (category grouping + term table)
 - `tests/test_phenotype.py` — 2 tests (shared column names + phenotype formatting)
-- `tests/test_pipeline_utils.py` — 5 tests (shared metric loading + DR tier map)
+- `tests/test_pipeline_utils.py` — 4 tests (shared metric loading + validators)
 - `tests/test_run_pipeline.py` — 8 tests (runner selection and dry-run)
 
 The archived `01_format_and_update_ids.py` integration test (17 tests) lives with its script in
@@ -35,8 +35,8 @@ Each test case is one line: `(description, expected_category, expected_tier)`.
 All descriptions are taken verbatim from the Hayles 2013 supplementary table.
 
 **Note:** Tier values in tests are the **signal-based tiers** (1–5) returned
-by `classify_growth()`. The final `Growth_tier` in pipeline output is
-re-ranked by DIT-HAP DR median (see `04_categorize_phenotypes.py`).
+by `classify_growth()`. The signal tier is internal to the classifier and is
+not written to the pipeline output.
 
 ### WT-like (signal tier 5) — no growth signal
 
@@ -275,13 +275,12 @@ and Table S3 parsers are no longer in the live module.
 | `test_column_names` | `Phenotype_description`, `Morphological_classification`, `Gene_dispensability` |
 | `test_format_hayles_phenotypes_normalises_text` | whitespace, trailing periods, and `25, 32` / `25 32` / `32, 25` → `25,32` |
 
-## `tests/test_keyword_profile.py` — keyword-profile labels (3 tests)
+## `tests/test_keyword_profile.py` — keyword-profile grouping (2 tests)
 
 | Test | What it pins down |
 |---|---|
-| `test_tier_labels_from_frame_uses_categories` | `Growth_tier` → modal `Category` from the input table |
-| `test_tier_label_falls_back_for_unknown_tier` | unknown tier → `Tier N` |
-| `test_build_term_table_uses_data_derived_labels` | output columns use the derived labels |
+| `test_count_words_per_category_groups_by_merged_category` | word counts grouped by merged `Category` |
+| `test_build_term_table_uses_category_columns` | one column per merged category, plus `Word category` and `Total` |
 
 ## `tests/test_dr_plotting.py` — shared plotting helpers (3 tests)
 

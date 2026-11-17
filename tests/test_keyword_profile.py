@@ -1,4 +1,4 @@
-"""Tests for keyword-profile tier labels."""
+"""Tests for keyword-profile category grouping."""
 
 from __future__ import annotations
 
@@ -10,34 +10,23 @@ import pandas as pd
 keyword_profile = importlib.import_module("02_keyword_profile")
 
 
-def test_tier_labels_from_frame_uses_categories():
+def test_count_words_per_category_groups_by_merged_category():
     df = pd.DataFrame(
         {
-            "Growth_tier": [1, 1, 3, 6],
-            "Category": ["spores", "spores", "divided", "small colonies"],
+            "Category": ["spores", "spores", "divided"],
+            "Phenotype_description": ["spores", "spores", "elongated"],
         }
     )
 
-    assert keyword_profile.tier_labels_from_frame(df) == {
-        1: "spores",
-        3: "divided",
-        6: "small colonies",
-    }
+    counts = keyword_profile.count_words_per_category(df)
+
+    assert counts["spores"]["spores"] == 2
+    assert counts["divided"]["elongated"] == 1
 
 
-def test_tier_label_falls_back_for_unknown_tier():
-    assert keyword_profile.tier_label(9, {1: "spores"}) == "Tier 9"
-
-
-def test_build_term_table_uses_data_derived_labels():
+def test_build_term_table_uses_category_columns():
     table = keyword_profile.build_term_table(
-        {1: Counter({"spores": 2}), 3: Counter({"long": 1})},
-        tier_labels={1: "spores", 3: "divided"},
+        {"spores": Counter({"spores": 2}), "divided": Counter({"long": 1})},
     )
 
-    assert list(table.columns) == [
-        "Category",
-        "Tier_1_spores",
-        "Tier_3_divided",
-        "Total",
-    ]
+    assert list(table.columns) == ["Word category", "divided", "spores", "Total"]

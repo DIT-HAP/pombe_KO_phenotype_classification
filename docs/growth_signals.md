@@ -28,9 +28,7 @@ The signal table defines a biological hierarchy of growth defect severity:
 | 5 | WT-like | Normal growth, no defect signals | `WT cells` |
 
 **Note:** The signal tier (1–5) is used internally by `classify_growth()` to
-determine the biological hierarchy. The final `Growth_tier` in the output
-tables is re-ranked by DIT-HAP DR median (see `04_categorize_phenotypes.py`
-and `05_merge_categories.py`).
+determine the biological hierarchy; it is not written to the output tables.
 
 ---
 

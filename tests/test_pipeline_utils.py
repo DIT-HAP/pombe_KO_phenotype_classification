@@ -1,7 +1,7 @@
-"""Tests for shared pipeline utilities (DR ranking + reference table loading).
+"""Tests for shared pipeline utilities (reference table loading + validators).
 
 DR is sign-flipped: negative and more negative = more depleted. These tests
-pin the tier-1 semantics (most depleted first) and the gRNA sign flip.
+pin the reference-table loading semantics, including the gRNA sign flip.
 """
 
 from __future__ import annotations
@@ -12,8 +12,6 @@ import pandas as pd
 import pytest
 
 from pipeline_utils import (
-    category_dr_medians,
-    dr_tier_map,
     load_dit_hap,
     load_grna,
     require_columns,
@@ -33,57 +31,6 @@ def test_require_sheets_rejects_missing_sheets():
 
     with pytest.raises(ValueError, match="missing required sheets"):
         require_sheets(sheets, ("Present", "Absent"), Path("input.xlsx"))
-
-
-def test_category_dr_medians_sorted_most_depleted_first():
-    df = pd.DataFrame(
-        {
-            "Systematic ID": ["g1", "g2", "g3", "g4", "g5", "g6"],
-            "Category": ["least", "least", "middle", "middle", "most", "most"],
-        }
-    )
-    dit_hap = pd.DataFrame(
-        {
-            "Systematic ID": ["g1", "g2", "g3", "g4", "g5", "g6"],
-            # Sign-flipped: "most" has the most negative median.
-            "DR": [0.2, 0.3, -0.4, -0.6, -1.5, -1.9],
-        }
-    )
-
-    medians = category_dr_medians(df, dit_hap)
-
-    assert list(medians.index) == ["most", "middle", "least"]
-    assert medians.iloc[0] < medians.iloc[-1]
-
-
-def test_category_dr_medians_tier_one_is_most_negative():
-    df = pd.DataFrame({"Systematic ID": ["a", "b"], "Category": ["X", "Y"]})
-    dit_hap = pd.DataFrame({"Systematic ID": ["a", "b"], "DR": [-2.0, 0.5]})
-
-    medians = category_dr_medians(df, dit_hap)
-    tier_map = {cat: i + 1 for i, cat in enumerate(medians.index)}
-
-    assert tier_map == {"X": 1, "Y": 2}
-
-
-def test_dr_tier_map_orders_categories():
-    df = pd.DataFrame(
-        {
-            "Systematic ID": ["a", "b", "c"],
-            "Category": ["X", "Y", "Z"],
-        }
-    )
-    dit_hap = pd.DataFrame(
-        {
-            "Systematic ID": ["a", "b", "c"],
-            "DR": [-2.0, 0.5, -1.0],
-        }
-    )
-
-    tier_map, medians = dr_tier_map(df, dit_hap)
-
-    assert tier_map == {"X": 1, "Z": 2, "Y": 3}
-    assert list(medians.index) == ["X", "Z", "Y"]
 
 
 def test_load_dit_hap_drops_null_dr(tmp_path):

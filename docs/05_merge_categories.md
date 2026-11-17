@@ -5,11 +5,10 @@
 ## Purpose
 
 Concatenates the three phenotype branches (one / multi / inconsistent) from
-the categorized output into a single table, applies manually revised category
-merges, and assigns `Growth_tier` based on sign-flipped DIT-HAP DR median per
-merged category (most depleted = tier 1).
+the categorized output into a single table and applies manually revised
+category merges.
 
-The fine-grained classification from step 04 is preserved as `Sub_category`,
+Step 04 already writes the fine-grained classification as `Sub_category`,
 while the revised/merged classification is stored in `Category`.
 
 ---
@@ -25,10 +24,6 @@ data/4_categorized_genes/                Hand-curated category config
   category_revisions.json                (sub-category order, merges,
                                          category order; shared with step 06)
                              ↓
-data/raw/                                Sign-flipped DIT-HAP DR for tier ranking
-  gene_level_fitting_statistics_
-  minusDR.tsv
-                             ↓
                    05_merge_categories.py
                              ↓
 data/5_merged_categories/                Final merged table + summaries
@@ -43,15 +38,10 @@ results/                                 Flat copy of All genes
 ## Processing Logic
 
 1. **Load and concat** — merge the three branch sheets into one DataFrame
-2. **Apply category merges** — rename the step-04 `Category` to
-   `Sub_category`, then map it through `category_revisions.json`
-   (`Sub_category → Category`). Sub-categories not listed in the JSON keep
-   themselves as their merged `Category`. The mapping is loaded by the shared
-   `src/category_revisions.py` helper.
-3. **Re-rank Growth_tier** — compute the median DIT-HAP DR per merged
-   `Category`, rank from most depleted (tier 1) to least depleted (tier N).
-   DR is sign-flipped (more negative = more depleted), so tier 1 has the
-   lowest median DR.
+2. **Apply category merges** — map the step-04 `Sub_category` through
+   `category_revisions.json` (`Sub_category → Category`). Sub-categories not
+   listed in the JSON keep themselves as their merged `Category`. The mapping
+   is loaded by the shared `src/category_revisions.py` helper.
 
 ---
 
@@ -64,16 +54,14 @@ results/                                 Flat copy of All genes
 Key columns:
 - `Sub_category` — fine-grained category from step 04 (e.g., `germinated, often divided`)
 - `Category` — merged category after manual revision (e.g., `germinated, divided or microcolonies`)
-- `Growth_tier` — DR-median-ranked tier (1 = most depleted = lowest/most negative DR median, N = least)
 - `Phenotype_count` — Single / Multiple / Temp_mismatch
 - `Consistency_25_32` — Consistent / Only_32 / Mismatch
 
-**Summary sheets (5):**
+**Summary sheets (4):**
 - `Consistency_25_32` — counts per consistency status
 - `Phenotype_count` — counts per Single/Multiple/Temp_mismatch
 - `Category` — counts per merged category
 - `Sub_category` — counts per fine-grained sub-category
-- `Growth_tier` — counts per tier
 
 ### `results/Hayles_2013_OB_merged_categories.xlsx`
 

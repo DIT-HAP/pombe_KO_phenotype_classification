@@ -1,19 +1,15 @@
 """
-Growth-tier Keyword Profile Analysis
-=====================================
+Category Keyword Profile Analysis
+=================================
 
-For each Growth_tier, extracts and categorises words from the phenotype
+For each merged ``Category``, extracts and categorises words from the phenotype
 descriptions — growth signal words, morphological words, modifier words —
 and reports their frequency.  This helps validate whether descriptions
-assigned to the same tier share similar vocabulary, and whether tiers are
-genuinely distinct.
-
-Tier labels are derived from the input table's ``Category`` column, so the
-column names follow the current DR-ranked categories instead of a hardcoded
-1-5 mapping.
+assigned to the same category share similar vocabulary, and whether categories
+are genuinely distinct.
 
 The output is an inspection table, not a word cloud.  Each row is a
-word; columns show its frequency per Growth_tier, allowing quick
+word; columns show its frequency per merged ``Category``, allowing quick
 assessment of which words drive the classification.
 
 Input
@@ -22,11 +18,11 @@ Input
 
 Output
 ------
-- ``data/2_keyword_profile/growth_tier_keyword_profile.xlsx``
+- ``data/2_keyword_profile/category_keyword_profile.xlsx``
   8 sheets:
-    - ``Tier sizes`` — gene count per Growth_tier
-    - ``Total vocab`` — all words with Category column, sorted by
-      Category then frequency
+    - ``Category sizes`` — gene count per merged ``Category``
+    - ``Total vocab`` — all words with a word-category column, sorted by
+      word category then frequency
     - ``Growth signals`` — canonical growth-stage words
       (spores, germinated, microcolonies, small colonies, etc.)
     - ``Morphology`` — shape / structural words
@@ -46,8 +42,8 @@ Usage
     mamba run -n bioinformatics python scripts/02_keyword_profile.py --verbose
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
-Date:     2026-06-11
-Version:  1.0.0
+Date:     2026-11-17
+Version:  1.1.0
 """
 
 # =============================================================================
@@ -82,7 +78,7 @@ from pipeline_utils import require_columns, setup_logger  # noqa: E402
 # =============================================================================
 
 DEFAULT_INPUT = Path("results/Hayles_2013_OB_merged_categories.xlsx")
-DEFAULT_OUTPUT = Path("data/2_keyword_profile/growth_tier_keyword_profile.xlsx")
+DEFAULT_OUTPUT = Path("data/2_keyword_profile/category_keyword_profile.xlsx")
 
 # ——— Word categories ——————————————————————————————————————————————————————————
 
@@ -420,9 +416,8 @@ PREFIX_WORD_CATEGORIES: tuple[tuple[str, set[str]], ...] = (
 
 # When reading from the final Excel, the description column name
 DESC_COL = PHENOTYPE_DESC_COL
-TIER_COL = "Growth_tier"
 CATEGORY_COL = "Category"
-REQUIRED_COLUMNS: tuple[str, ...] = (TIER_COL, CATEGORY_COL, DESC_COL)
+REQUIRED_COLUMNS: tuple[str, ...] = (CATEGORY_COL, DESC_COL)
 
 # =============================================================================
 # CORE LOGIC
@@ -441,21 +436,6 @@ def tokenise(text: str) -> list[str]:
     for phrase, replacement in PHRASE_PATTERNS.items():
         t = t.replace(phrase, replacement)
     return [tok.strip(".,;:!?'") for tok in re.split(r"[,\s;:()]+", t) if tok.strip(".,;:!?'")]
-
-
-def tier_labels_from_frame(df: pd.DataFrame) -> dict[int, str]:
-    """Map each Growth_tier to its most common category in the input table."""
-    labels: dict[int, str] = {}
-    for tier in df[TIER_COL].dropna().unique():
-        categories = df.loc[df[TIER_COL] == tier, CATEGORY_COL]
-        mode = categories.mode()
-        labels[int(tier)] = str(mode.iloc[0]) if not mode.empty else f"Tier {tier}"
-    return labels
-
-
-def tier_label(tier: int, labels: dict[int, str]) -> str:
-    """Human-readable tier name, derived from the input table."""
-    return labels.get(int(tier), f"Tier {tier}")
 
 
 def _is_stop_word(word: str) -> bool:
@@ -477,32 +457,31 @@ def _classify_word(word: str) -> str:
 
 
 def build_term_table(
-    term_counts: dict[int, Counter],
+    term_counts: dict[str, Counter],
     selected_terms: set[str] | None = None,
     top_n: int | None = 50,
-    tier_labels: dict[int, str] | None = None,
 ) -> pd.DataFrame:
-    """Build a DataFrame: rows = terms, columns = tier frequencies."""
+    """Build a DataFrame: rows = terms, columns = category frequencies."""
     rows: list[dict] = []
-    for tier in sorted(term_counts):
-        for word, count in term_counts[tier].most_common():
+    for category in sorted(term_counts):
+        for word, count in term_counts[category].most_common():
             if selected_terms and word not in selected_terms:
                 continue
-            rows.append({"term": word, "tier": tier, "count": count})
+            rows.append({"term": word, "category": category, "count": count})
 
     if not rows:
         return pd.DataFrame()
 
     df = pd.DataFrame(rows)
 
-    # Pivot: rows = term, columns = tier
+    # Pivot: rows = term, columns = merged Category
     pivot = (
-        df.groupby(["term", "tier"])["count"]
+        df.groupby(["term", "category"])["count"]
         .sum()
         .reset_index()
         .pivot_table(
             index="term",
-            columns="tier",
+            columns="category",
             values="count",
             aggfunc="sum",
             fill_value=0,
@@ -510,20 +489,15 @@ def build_term_table(
         .astype(int)
     )
 
-    # Rename columns to human-readable
-    pivot.columns = [f"Tier_{c}_{tier_label(c, tier_labels or {})}" for c in pivot.columns]
-
-    # Add category column (before the numeric columns) — do this BEFORE
-    # renaming the index so the classifier sees the hyphenated tokens.
-    pivot.insert(0, "Category", [_classify_word(w) for w in pivot.index])
+    # Add the word's vocabulary label before the numeric category columns
+    pivot.insert(0, "Word category", [_classify_word(w) for w in pivot.index])
 
     # Restore original display names for hyphenated compound tokens
     pivot = pivot.rename(index=DISPLAY_NAMES)
 
     # Add total column and sort
-    pivot["Total"] = pivot.iloc[:, 1:].sum(axis=1)  # skip Category col
-    # Sort by Category (alphabetical), then Total descending
-    pivot = pivot.sort_values(["Category", "Total"], ascending=[True, False])
+    pivot["Total"] = pivot.iloc[:, 1:].sum(axis=1)  # skip Word category
+    pivot = pivot.sort_values(["Word category", "Total"], ascending=[True, False])
     if top_n is not None:
         pivot = pivot.head(top_n)
 
@@ -538,7 +512,7 @@ def build_term_table(
 def parse_args() -> argparse.Namespace:
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Build keyword profile per Growth_tier.",
+        description="Build keyword profile per merged Category.",
     )
     parser.add_argument(
         "--input",
@@ -556,66 +530,54 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def count_words_per_tier(
-    df: pd.DataFrame,
-    tier_labels: dict[int, str],
-) -> dict[int, Counter]:
-    """Tokenise every tier's descriptions and count each word."""
-    tier_word_counts: dict[int, Counter] = {}
-    for tier in sorted(df[TIER_COL].dropna().unique()):
-        tier_value = int(tier)
-        texts = df.loc[df[TIER_COL] == tier, DESC_COL].dropna()
+def count_words_per_category(df: pd.DataFrame) -> dict[str, Counter]:
+    """Tokenise every merged category's descriptions and count each word."""
+    category_word_counts: dict[str, Counter] = {}
+    for category in sorted(df[CATEGORY_COL].dropna().unique()):
+        texts = df.loc[df[CATEGORY_COL] == category, DESC_COL].dropna()
         counter: Counter = Counter()
         for text in texts:
             counter.update(tokenise(text))
-        tier_word_counts[tier_value] = counter
+        category_word_counts[str(category)] = counter
         logger.debug(
-            f"  Tier {tier_value} ({tier_label(tier_value, tier_labels)}): "
-            f"{len(texts):,} genes, {len(counter):,} unique words",
+            f"  {category}: {len(texts):,} genes, {len(counter):,} unique words",
         )
-    return tier_word_counts
+    return category_word_counts
 
 
 def build_vocab_tables(
-    tier_word_counts: dict[int, Counter],
-    tier_labels: dict[int, str],
+    category_word_counts: dict[str, Counter],
 ) -> dict[str, pd.DataFrame]:
     """Build the vocabulary sheets, keyed by output sheet name."""
     tables = {
         "Total vocab": build_term_table(
-            tier_word_counts,
+            category_word_counts,
             top_n=None,
-            tier_labels=tier_labels,
         ),
         "Growth signals": build_term_table(
-            tier_word_counts,
+            category_word_counts,
             selected_terms=GROWTH_SIGNAL_WORDS,
             top_n=50,
-            tier_labels=tier_labels,
         ),
         "Morphology": build_term_table(
-            tier_word_counts,
+            category_word_counts,
             selected_terms=MORPHOLOGY_WORDS,
             top_n=80,
-            tier_labels=tier_labels,
         ),
         "Viability": build_term_table(
-            tier_word_counts,
+            category_word_counts,
             selected_terms=VIABILITY_WORDS,
             top_n=30,
-            tier_labels=tier_labels,
         ),
         "Process": build_term_table(
-            tier_word_counts,
+            category_word_counts,
             selected_terms=PROCESS_WORDS,
             top_n=30,
-            tier_labels=tier_labels,
         ),
         "Modifiers": build_term_table(
-            tier_word_counts,
+            category_word_counts,
             selected_terms=MOD_FREQ_WORDS | MOD_DEGREE_WORDS | MOD_QUANT_WORDS,
             top_n=80,
-            tier_labels=tier_labels,
         ),
     }
     for table in tables.values():
@@ -625,19 +587,17 @@ def build_vocab_tables(
 
 
 def build_other_table(
-    tier_word_counts: dict[int, Counter],
-    tier_labels: dict[int, str],
+    category_word_counts: dict[str, Counter],
 ) -> pd.DataFrame:
     """Build the sheet of words outside every curated vocabulary set."""
     other_terms: set[str] = set()
-    for counter in tier_word_counts.values():
+    for counter in category_word_counts.values():
         other_terms.update(counter.keys())
     other_terms -= IGNORED
     table = build_term_table(
-        tier_word_counts,
+        category_word_counts,
         selected_terms=other_terms,
         top_n=50,
-        tier_labels=tier_labels,
     )
     if not table.empty:
         table.index.name = "word"
@@ -652,9 +612,9 @@ def write_workbook(
 ) -> None:
     """Write the summary, vocabulary sheets, and other-words sheet."""
     with pd.ExcelWriter(output_path) as writer:
-        summary = df[TIER_COL].value_counts().sort_index().rename("gene_count").to_frame()
-        summary.index.name = TIER_COL
-        summary.to_excel(writer, sheet_name="Tier sizes")
+        summary = df[CATEGORY_COL].value_counts().sort_index().rename("gene_count").to_frame()
+        summary.index.name = CATEGORY_COL
+        summary.to_excel(writer, sheet_name="Category sizes")
 
         for sheet_name, table in tables.items():
             if not table.empty:
@@ -664,17 +624,16 @@ def write_workbook(
 
 
 def build_profile(input_path: Path, output_path: Path) -> None:
-    """Load the merged table, profile each Growth_tier, and write the workbook."""
+    """Load the merged table, profile each merged category, and write the workbook."""
     logger.info(f"Loading classifications: {input_path}")
     df = pd.read_excel(input_path)
     require_columns(df, REQUIRED_COLUMNS, input_path)
-    logger.info(f"Loaded {len(df):,} genes, {df[TIER_COL].nunique()} tiers")
-    tier_labels = tier_labels_from_frame(df)
+    logger.info(f"Loaded {len(df):,} genes, {df[CATEGORY_COL].nunique()} categories")
 
     logger.info("Building vocabulary tables ...")
-    tier_word_counts = count_words_per_tier(df, tier_labels)
-    tables = build_vocab_tables(tier_word_counts, tier_labels)
-    other_table = build_other_table(tier_word_counts, tier_labels)
+    category_word_counts = count_words_per_category(df)
+    tables = build_vocab_tables(category_word_counts)
+    other_table = build_other_table(category_word_counts)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     write_workbook(output_path, df, tables, other_table)

@@ -3,23 +3,19 @@ Shared Pipeline Utilities
 =========================
 
 Small helpers used by more than one pipeline step: logging setup, the
-PomBase release constant, and reference-table loading (DIT-HAP / gRNA) with
-DR-median ranking.
+PomBase release constant, and reference-table loading (DIT-HAP / gRNA).
 
 DIT-HAP ``DR`` is sign-flipped: it is negative, and a more negative value
-means more severe depletion. ``category_dr_medians`` therefore sorts
-ascending so that tier 1 is the most depleted (most negative) category.
+means more severe depletion.
 
-Keeping these here removes the copy-pasted ``setup_logger`` blocks and the
-duplicated DR-ranking logic in ``04_categorize_phenotypes.py`` and
-``05_merge_categories.py``.
+Keeping these here removes the copy-pasted ``setup_logger`` blocks.
 
 Usage
 -----
-    from pipeline_utils import setup_logger, load_dit_hap, category_dr_medians
+    from pipeline_utils import setup_logger, load_dit_hap
 
     setup_logger()
-    medians = category_dr_medians(df, load_dit_hap(dit_hap_path))
+    dit_hap = load_dit_hap(dit_hap_path)
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
 Date:     2026-09-14
@@ -112,32 +108,6 @@ def load_dit_hap(path: Path) -> pd.DataFrame:
     stores the flipped values, so no negation happens here.
     """
     return _load_metric(path, "DR")
-
-
-def category_dr_medians(
-    df: pd.DataFrame,
-    dit_hap: pd.DataFrame,
-    category_col: str = "Category",
-) -> pd.Series:
-    """Median DIT-HAP DR per category, sorted lowest first (tier 1 = lowest).
-
-    Because DR is sign-flipped (more negative = more depleted), sorting
-    ascending puts the most depleted category first, i.e. tier 1.
-    """
-    joined = df.merge(dit_hap, on="Systematic ID", how="left")
-    medians = joined.groupby(category_col)[["DR"]].median()["DR"]
-    return medians.sort_values(ascending=True)
-
-
-def dr_tier_map(
-    df: pd.DataFrame,
-    dit_hap: pd.DataFrame,
-    category_col: str = "Category",
-) -> tuple[dict[str, int], pd.Series]:
-    """Return Category -> DR tier (1 = most depleted) and the DR medians."""
-    medians = category_dr_medians(df, dit_hap, category_col=category_col)
-    tier_map = {cat: i + 1 for i, cat in enumerate(medians.index)}
-    return tier_map, medians
 
 
 def load_grna(path: Path) -> pd.DataFrame:

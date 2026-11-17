@@ -42,7 +42,7 @@ pombe_KO_phenotype_classification/
 │   │   ├── hayles2013/      Hayles 2013 PDFs + supplementary tables
 │   │   └── previous_manual_check_.../ (hand-curated)
 │   ├── 1_formatted/        Hayles phenotype table + Kim paralog pre-merge
-│   ├── 2_keyword_profile/  keyword-level analysis per Growth_tier
+│   ├── 2_keyword_profile/  keyword-level analysis per merged Category
 │   ├── 3_grouped_genes/    grouped by phenotype consistency
 │   ├── 4_categorized_genes/ categorized phenotypes, inspection pivots
 │   │                        + category_revisions.json (orders + merges)
@@ -156,13 +156,13 @@ Scripts run in this order:
    (`Hayles2013_phenotypes_premerge.xlsx`), and the 4,843-row
    `Hayles2013_phenotypes_annotated.xlsx` that feeds step 03.
 3. **03_group_genes.py** — groups genes by phenotype consistency at different temperatures
-4. **04_categorize_phenotypes.py** — categorises growth phenotypes using signal-based detection;
-   re-ranks Growth_tier by sign-flipped DIT-HAP DR median (most depleted = tier 1)
+4. **04_categorize_phenotypes.py** — categorises growth phenotypes using signal-based detection
+   and writes the fine-grained `Sub_category` column
 5. **05_merge_categories.py** — merges three branches, applies the hand-curated
    `Sub_category → Category` merges (`data/4_categorized_genes/category_revisions.json`),
-   re-ranks Growth_tier by DR median
+   and writes the final merged table
 6. **02_keyword_profile.py** — keyword-level analysis validating word categories
-   (growth signals, morphology, modifiers) per Growth_tier. Re-analysis of the
+   (growth signals, morphology, modifiers) per merged `Category`. Re-analysis of the
    final merged output, so it runs **after 05**, despite its number.
 7. **06_plot_dr_distribution.py** — cnsplots violin/box + statistics-table plots of
    sign-flipped depletion (DR for DIT-HAP, um for gRNA; more negative = more depleted);
@@ -172,15 +172,14 @@ Scripts run in this order:
    pure categories (spores, germinated, microcolonies, small colonies, WT-like)
 
 Final output lands in `data/5_merged_categories/Hayles_2013_OB_merged_categories.xlsx`
-(the six-sheet workbook), a flat single-sheet copy of `All genes` in
+(the five-sheet workbook), a flat single-sheet copy of `All genes` in
 `results/Hayles_2013_OB_merged_categories.xlsx`, and
 `results/DR_um_distribution_*.{png,pdf}`.
 
 ## Key concepts
 
-- **Sub_category** — fine-grained classification from `classify_growth()` (e.g. `germinated, often divided`)
+- **Sub_category** — fine-grained classification from `classify_growth()`, written by step 04 (e.g. `germinated, often divided`)
 - **Category** — merged classification after manual revision (e.g. `germinated, divided or microcolonies`)
-- **Growth_tier** — ranked by sign-flipped DIT-HAP DR median per category (tier 1 = most depleted = most negative DR, most severe growth defect)
 - **Signal tier** — biological hierarchy (1=spores, 2=germinated, 3=microcolonies, 4=small colonies, 5=WT-like); used internally by `classify_growth()` but not in final output
 
 ## Test suite

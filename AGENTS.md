@@ -50,14 +50,14 @@ DIT-HAP/gRNA depletion-rate validation.
   reads `results/Hayles_2013_OB_merged_categories.xlsx`), so despite its number
   it runs *after* `05`, not before `03`. `06_plot_dr_distribution.py` and
   `07_plot_dr_distribution_pure.py` also run after `05`.
-- `05` writes the six-sheet workbook to `data/5_merged_categories/` and a
+- `05` writes the five-sheet workbook to `data/5_merged_categories/` and a
   flat single-sheet copy of `All genes` to `results/`. `06`/`07` write each
   figure as both PNG and PDF to `results/`.
 
 ## Testing
 
 ```bash
-mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (130 tests)
+mamba run -n bioinformatics python -m pytest tests/ -v            # full suite (128 tests)
 mamba run -n bioinformatics python -m pytest tests/test_growth_signals.py -v
 mamba run -n bioinformatics python -m pytest tests/test_classification.py -v
 mamba run -n bioinformatics python -m pytest tests/test_dataset_merge.py -v
@@ -118,17 +118,15 @@ mamba run -n bioinformatics ty check \
   stats-table columns and p-value brackets. Imported by `06` and `07`; it
   needs matplotlib and scipy but not cnsplots.
 - `src/pipeline_utils.py` — shared `setup_logger`, `load_dit_hap`,
-  `category_dr_medians`, the `require_columns` / `require_sheets` boundary
-  validators, and the `DEFAULT_RELEASE` constant.
+  the `require_columns` / `require_sheets` boundary validators, and the
+  `DEFAULT_RELEASE` constant.
 - `src/category_revisions.py` — shared loader for
   `data/4_categorized_genes/category_revisions.json`, which has three sections:
   `sub_category_order` (original figure), `revisions` (`Sub_category → Category`
   merges), `category_order` (revised figure). Imported by `05` and `06`.
-- **Two different "tiers"** — don't conflate them:
-  - *signal tier* (1–5): fixed biological hierarchy, internal to
-    `classify_growth()`.
-  - `Growth_tier`: output column, re-ranked by median DIT-HAP DR per category
-    in `04`/`05`. Test expectations use signal tiers.
+- *signal tier* (1–5): fixed biological hierarchy, internal to
+  `classify_growth()` and not written to the output tables. Test expectations
+  use signal tiers.
 - `germination` (noun) is intentionally **not** a growth signal — it appears
   only in morphological contexts; the adjective `germinated` is the signal.
 - The revised figure's draw order and the `Sub_category → Category` merges
@@ -187,7 +185,7 @@ mamba run -n bioinformatics ty check \
     archived `01_format_and_update_ids.py` for the documented-change classes)
   - `pombase-2026-06-01_gene_IDs_names_products.tsv` (produced by `00`)
   The fitted DIT-HAP/gRNA parameters live in `data/raw/` (not gitignored):
-  - `gene_level_fitting_statistics_minusDR.tsv` (sign-flipped DR; `04`/`05`/`06`/`07`)
+  - `gene_level_fitting_statistics_minusDR.tsv` (sign-flipped DR; `05`/`06`/`07`)
   - `260127-all_genes_order1_gRNA_HDdata_fitted_parameters.tsv` (`06`/`07`)
   The other exception is the hand-curated
   `previous_manual_check_of_insistent_phenotypes/` subfolder, re-included via
@@ -217,4 +215,4 @@ Per-step design notes live in `docs/` (`00_`, `01_`, `04_`, `05_`,
 The reconciliation note describes the archived `01_format_and_update_ids.py`
 union; the live pipeline starts at `01`.
 `README.md` has the paper context and concept glossary (`Sub_category` vs
-`Category` vs `Growth_tier`).
+`Category`).

@@ -2,10 +2,9 @@
 Categorise Growth Phenotypes
 =============================
 
-Reads grouped phenotype data (3 sheets from step 03), assigns each gene a
-fine-grained ``Category`` using the signal-based ``classify_growth()``
-engine, then re-ranks ``Growth_tier`` by DIT-HAP DR median (most depleted
-= tier 1; DR is sign-flipped, so more negative = more depleted).
+Reads grouped phenotype data (3 sheets from step 03) and assigns each gene a
+fine-grained ``Sub_category`` using the signal-based ``classify_growth()``
+engine.
 
 Input
 -----
@@ -17,14 +16,10 @@ Input
    Inconsistent_phenotypes_at_25_32_manual.xlsx``
   Manual annotations for the 131 inconsistent genes.
 
-- ``data/raw/gene_level_fitting_statistics_minusDR.tsv``
-  Sign-flipped DIT-HAP DR values used for Growth_tier re-ranking
-  (negative = more depleted).
-
 Output
 ------
 - ``data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx``
-  Main data output — 4 sheets with ``Category`` and ``Growth_tier`` columns:
+  Main data output — 4 sheets with a ``Sub_category`` column:
     - ``One basic phenotype`` — single-phenotype, consistent at 25/32°C
     - ``Multi basic phenotypes`` — multi-phenotype, consistent at 25/32°C
     - ``Inconsistent phenotypes`` — temperature-inconsistent, manual annotation
@@ -33,8 +28,8 @@ Output
 - ``data/4_categorized_genes/Hayles_2013_OB_inspection_phenotypes.xlsx``
   Inspection pivot tables — separate from the main output for easy review:
     - ``Flat inspection`` — one row per unique description with gene counts
-    - Per-branch Phenotypes, Essentiality, Classification, Growth_tier pivots
-    - ``Multi-level pivot (All genes)`` — full description text x 4-level
+    - Per-branch Phenotypes, Essentiality, Classification pivots
+    - ``Multi-level pivot (All genes)`` — full description text x 3-level
       column hierarchy with conditional formatting and binary-signature sorting
 
 Usage
@@ -43,8 +38,8 @@ Usage
     mamba run -n bioinformatics python scripts/04_categorize_phenotypes.py --verbose
 
 Author:   Yusheng Yang (guidance) + Hermes (implementation)
-Date:     2026-10-28
-Version:  1.2.1
+Date:     2026-11-17
+Version:  1.3.0
 """
 
 # =============================================================================
@@ -68,15 +63,13 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 # 5. Local imports
-from growth_signals import SIGNAL_TIERS, classify_growth  # noqa: E402
+from growth_signals import classify_growth  # noqa: E402
 from phenotype import (  # noqa: E402
     DISPENSABILITY_COL,
     MORPHOLOGY_COL,
     PHENOTYPE_DESC_COL,
 )
 from pipeline_utils import (  # noqa: E402
-    dr_tier_map,
-    load_dit_hap,
     require_columns,
     require_sheets,
     setup_logger,
@@ -93,7 +86,6 @@ DEFAULT_MANUAL = Path(
     "/Inconsistent_phenotypes_at_25_32_manual.xlsx"
 )
 DEFAULT_OUTPUT = Path("data/4_categorized_genes/Hayles_2013_OB_categorized_phenotypes.xlsx")
-DEFAULT_DIT_HAP = Path("data/raw/gene_level_fitting_statistics_minusDR.tsv")
 
 DATA_SHEETS: tuple[str, ...] = (
     "One basic phenotype",
@@ -118,27 +110,15 @@ DESC_COL = PHENOTYPE_DESC_COL
 # =============================================================================
 
 
-def rerank_growth_tier_by_dr(df: pd.DataFrame, dit_hap: pd.DataFrame) -> pd.DataFrame:
-    """Reassign Growth_tier based on DR median per Category, most depleted first.
-
-    DR is sign-flipped (more negative = more depleted), so the lowest median
-    becomes tier 1.
-    """
-    tier_map, _ = dr_tier_map(df, dit_hap)
-    tiers = df["Category"].map(tier_map).astype(int)
-    logger.info(f"  Growth_tier re-ranked by DR median ({len(tier_map)} categories)")
-    return df.assign(Growth_tier=tiers)
-
-
 def classify_basic_phenotype(df: pd.DataFrame) -> pd.DataFrame:
-    """Assign Category and Growth_tier from the ``Basic phenotype`` column.
+    """Assign ``Sub_category`` from the ``Basic phenotype`` column.
 
     Used for both the one-phenotype and multi-phenotype branches —
     ``classify_growth`` handles modifier-led segments internally.
     """
     results = df["Basic phenotype"].map(classify_growth)
     df = df.copy()
-    df[["Category", "Growth_tier"]] = pd.DataFrame(results.tolist(), index=df.index)
+    df["Sub_category"] = [category for category, _ in results]
     return df
 
 
@@ -146,11 +126,10 @@ def classify_inconsistent_phenotype(
     df: pd.DataFrame,
     manual_path: Path,
 ) -> pd.DataFrame:
-    """Merge manual annotations and derive Category / Growth_tier.
+    """Merge manual annotations and derive ``Sub_category``.
 
-    Uses the pre-annotated ``Category_32`` from the manual file.  If the
-    merge produces an unrecognised category name, falls back to ``WT-like``.
-    Growth_tier is later re-ranked by DIT-HAP DR median.
+    Uses the pre-annotated ``Category_32`` from the manual file. If the
+    merge produces no manual label, falls back to ``WT-like``.
     """
     logger.info(f"Loading manual annotations: {manual_path}")
     manual = pd.read_excel(manual_path)
@@ -163,11 +142,8 @@ def classify_inconsistent_phenotype(
         how="left",
     ).drop(columns="SysID")
 
-    # Use Category_32 as the final category, normalising legacy "WT" → "WT-like"
-    df["Category"] = df["Category_32"].fillna("WT-like").replace({"WT": "WT-like"})
-
-    # Derive Growth_tier from category name
-    df["Growth_tier"] = df["Category"].map(SIGNAL_TIERS).fillna(5).astype(int)
+    # Use Category_32 as the final sub-category, normalising legacy "WT" → "WT-like"
+    df["Sub_category"] = df["Category_32"].fillna("WT-like").replace({"WT": "WT-like"})
 
     return df
 
@@ -257,62 +233,43 @@ def build_pivots(
         pivots[f"Phenotypes pivot ({label})"] = build_pivot(
             frame,
             DESC_COL,
-            "Category",
+            "Sub_category",
         )
         pivots[f"Essentiality pivot ({label})"] = build_pivot(
             frame,
             DISPENSABILITY_COL,
-            "Category",
+            "Sub_category",
         )
         pivots[f"Classification pivot ({label})"] = build_pivot(
             frame,
             MORPHOLOGY_COL,
-            "Category",
-        )
-        pivots[f"Growth_tier pivot ({label})"] = build_pivot(
-            frame,
-            MORPHOLOGY_COL,
-            "Growth_tier",
+            "Sub_category",
         )
     pivots["Phenotypes pivot (All genes)"] = build_pivot(
         all_genes,
         DESC_COL,
-        "Category",
+        "Sub_category",
     )
     return pivots
 
 
-def split_reranked_branches(
-    all_genes: pd.DataFrame,
-    n_one: int,
-    n_multi: int,
-) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    """Slice the concatenated, re-ranked table back into its three branches."""
-    return (
-        all_genes.iloc[:n_one].copy(),
-        all_genes.iloc[n_one : n_one + n_multi].copy(),
-        all_genes.iloc[n_one + n_multi :].copy(),
-    )
-
-
 def build_inspection_pivot(all_genes: pd.DataFrame) -> pd.DataFrame:
-    """Pivot gene counts by description and the four classification dimensions."""
+    """Pivot gene counts by description and the three classification dimensions."""
     dimensions = [
         DESC_COL,
-        "Growth_tier",
-        "Category",
+        "Sub_category",
         "Phenotype_count",
         "Consistency_25_32",
     ]
     counts = all_genes.groupby(dimensions).agg(Count=(DESC_COL, "size")).reset_index()
     multi_pivot = counts.pivot_table(
         index=DESC_COL,
-        columns=["Growth_tier", "Category", "Phenotype_count", "Consistency_25_32"],
+        columns=["Sub_category", "Phenotype_count", "Consistency_25_32"],
         values="Count",
         fill_value=0,
     ).astype(int)
 
-    # Growth_tier ascending (1 to 5), then alphabetical for lower levels.
+    # Alphabetical column order; the leftmost column is the primary sort key.
     multi_pivot = multi_pivot.sort_index(axis=1)
     # Within each column's non-zero block, the largest count sorts first; the
     # leftmost column is the primary key and all-zero rows sink to the bottom.
@@ -327,9 +284,8 @@ def build_flat_inspection(all_genes: pd.DataFrame) -> pd.DataFrame:
     """Build one row per unique description and classification combination."""
     dimensions = [
         DESC_COL,
-        "Category",
+        "Sub_category",
         "Phenotype_count",
-        "Growth_tier",
         "Consistency_25_32",
     ]
     gene_counts = (
@@ -346,16 +302,15 @@ def build_flat_inspection(all_genes: pd.DataFrame) -> pd.DataFrame:
     ordered = gene_counts[
         [
             "Phenotype description",
-            "Category",
+            "Sub_category",
             "Single/Multiple/Temp_mismatch",
             "Consistency_25_32",
-            "Growth_tier",
             "Gene count",
         ]
     ]
     return ordered.sort_values(
-        by=["Category", "Single/Multiple/Temp_mismatch", "Growth_tier", "Gene count"],
-        ascending=[True, True, True, False],
+        by=["Sub_category", "Single/Multiple/Temp_mismatch", "Gene count"],
+        ascending=[True, True, False],
     ).reset_index(drop=True)
 
 
@@ -408,14 +363,6 @@ def build_categorized(
     }
     all_genes = pd.concat([one, multi, inconsistent], ignore_index=True)
     pivots = build_pivots(branches, all_genes)
-
-    logger.info("Re-ranking Growth_tier by DIT-HAP DR median…")
-    all_genes = rerank_growth_tier_by_dr(all_genes, load_dit_hap(DEFAULT_DIT_HAP))
-    one, multi, inconsistent = split_reranked_branches(
-        all_genes,
-        len(one),
-        len(multi),
-    )
 
     logger.info("Building multi-level inspection pivot…")
     multi_pivot = build_inspection_pivot(all_genes)

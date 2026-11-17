@@ -41,7 +41,7 @@
 |---|---|
 | `03_group_genes.py` | `Systematic ID`, `Phenotype_description` |
 | `04_categorize_phenotypes.py` | `Phenotype_description`, `Morphological_classification`, `Gene_dispensability`, `Basic phenotype` |
-| `02_keyword_profile.py` | `Phenotype_description` |
+| `02_keyword_profile.py` | `Phenotype_description`, `Category` |
 | `06_plot_dr_distribution.py` | `Systematic ID`, `Sub_category`, `Category` |
 | `07_plot_dr_distribution_pure.py` | `Systematic ID`, `Sub_category`, `Morphological_classification` |
 
